@@ -14,19 +14,22 @@ pc = Pinecone(api_key="3f6ed6fe-57ee-48af-b5b8-268b75a22022")
 index = pc.Index("insurancedoc")
 openai.api_key = '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'
 
-def read_text_file(file):
+def read_text_file(file_path, encoding='utf-8'):
     try:
-        return file.read().decode('utf-8')
+        with open(file_path, 'r', encoding=encoding) as file:
+            return file.read()
     except UnicodeDecodeError:
-        return file.read().decode('latin-1')
+        with open(file_path, 'r', encoding='latin-1') as file:
+            return file.read()
 
-def read_pdf_file(file):
-    reader = PdfFileReader(file)
-    text = ""
-    for page_num in range(reader.numPages):
-        page = reader.getPage(page_num)
-        text += page.extract_text()
-    return text
+def read_pdf_file(file_path):
+    with open(file_path, 'rb') as file:
+        reader = PdfFileReader(file)
+        text = ""
+        for page_num in range(reader.numPages):
+            page = reader.getPage(page_num)
+            text += page.extract_text()
+        return text
 
 def get_embeddings(text):
     response = openai.Embedding.create(
@@ -35,19 +38,18 @@ def get_embeddings(text):
     )
     return response['data'][0]['embedding']
 
-def upload_documents_to_pinecone(files):
-    for file in files:
-        file_extension = os.path.splitext(file.name)[1].lower()
-        if file_extension == '.txt':
-            document_text = read_text_file(file)
-        elif file_extension == '.pdf':
-            document_text = read_pdf_file(file)
+def upload_documents_to_pinecone(file_paths):
+    for file_path in file_paths:
+        if file_path.endswith('.txt'):
+            document_text = read_text_file(file_path)
+        elif file_path.endswith('.pdf'):
+            document_text = read_pdf_file(file_path)
         else:
-            st.error(f"Unsupported file format: {file.name}")
+            print(f"Unsupported file format: {file_path}")
             continue
         
         document_embedding = get_embeddings(document_text)
-        document_id = file.name
+        document_id = os.path.basename(file_path)
         
         index.upsert([
             (document_id, document_embedding, {"text": document_text})
