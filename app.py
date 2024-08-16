@@ -14,19 +14,11 @@ pc = Pinecone(api_key="3f6ed6fe-57ee-48af-b5b8-268b75a22022")
 index = pc.Index("insurancedoc")
 openai.api_key = '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'
 
-# def read_text_file(file):
-#     try:
-#         return file.read().decode('utf-8')
-#     except UnicodeDecodeError:
-#         return file.read().decode('latin-1')
-    
-def read_text_file(file, encoding='utf-8'):
+def read_text_file(file):
     try:
-        with open(file, 'r', encoding=encoding) as file:
-            return file.read()
+        return file.read().decode('utf-8')
     except UnicodeDecodeError:
-        with open(file, 'r', encoding='latin-1') as file:
-            return file.read()    
+        return file.read().decode('latin-1')
 
 def read_pdf_file(file):
     reader = PdfFileReader(file)
@@ -57,8 +49,8 @@ def upload_document_to_pinecone(file, file_name):
     
     # Upsert data with metadata
     index.upsert([
-            (document_id, document_embedding, {"text": document_text})
-        ])
+        (document_id, document_embedding, {"text": document_text})
+    ])
     st.success(f"Document '{document_id}' successfully added to Pinecone index.")
 
 st.title("Document Upload to Pinecone")
