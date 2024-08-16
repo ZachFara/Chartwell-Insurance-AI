@@ -4,10 +4,6 @@ from pinecone import Pinecone
 from PyPDF2 import PdfFileReader
 import os
 import io
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
 
 # Initialize Pinecone and OpenAI
 pc = Pinecone(api_key="3f6ed6fe-57ee-48af-b5b8-268b75a22022")
@@ -56,7 +52,7 @@ def upload_documents_to_pinecone(file_paths):
         ])
         st.success(f"Document '{document_id}' successfully added to Pinecone index.")
 
-st.title("Document Upload and Indexing")
+st.title("Document Upload for Chartwell Insurance AI Database")
 
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
 
