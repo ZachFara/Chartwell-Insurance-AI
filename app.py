@@ -29,7 +29,7 @@ def get_embeddings(text, openai_api_key):
     return response['data'][0]['embedding']
 
 def upload_documents_to_pinecone(files, pinecone_api_key, index_name, openai_api_key):
-    Pinecone.init(api_key=pinecone_api_key)
+    Pinecone(api_key=pinecone_api_key)
     index = Pinecone.Index(index_name)
     
     for file in files:
