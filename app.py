@@ -14,19 +14,23 @@ pc = Pinecone(api_key="3f6ed6fe-57ee-48af-b5b8-268b75a22022")
 index = pc.Index("insurancedoc")
 openai.api_key = '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'
 
-def read_text_file(file):
+
+def read_text_file(file, encoding='utf-8'):
     try:
-        return file.read().decode('utf-8')
+        with open(file, 'r', encoding=encoding) as file:
+            return file.read()
     except UnicodeDecodeError:
-        return file.read().decode('latin-1')
+        with open(file, 'r', encoding='latin-1') as file:
+            return file.read()
 
 def read_pdf_file(file):
-    reader = PdfFileReader(file)
-    text = ""
-    for page_num in range(reader.numPages):
-        page = reader.getPage(page_num)
-        text += page.extract_text()
-    return text
+    with open(file, 'rb') as file:
+        reader = PdfFileReader(file)
+        text = ""
+        for page_num in range(reader.numPages):
+            page = reader.getPage(page_num)
+            text += page.extract_text()
+        return text
 
 def get_embeddings(text):
     response = openai.Embedding.create(
