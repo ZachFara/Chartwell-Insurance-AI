@@ -47,8 +47,13 @@ def upload_document_to_pinecone(file, file_name):
     document_embedding = get_embeddings(document_text)
     document_id = file_name
     
+    # Upsert data with metadata
     index.upsert([
-        (document_id, document_embedding, {"text": document_text})
+        {
+            'id': document_id,
+            'values': document_embedding,
+            'metadata': {'text': document_text}
+        }
     ])
     st.success(f"Document '{document_id}' successfully added to Pinecone index.")
 
