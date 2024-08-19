@@ -4,11 +4,14 @@ from pinecone import Pinecone
 from PyPDF2 import PdfFileReader
 import os
 import io
+from dotenv import load_dotenv
 
-# Initialize Pinecone and OpenAI
-pc = Pinecone(api_key="3f6ed6fe-57ee-48af-b5b8-268b75a22022")
+# Load environment variables 
+load_dotenv()
+
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("insurancedoc")
-openai.api_key = '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'
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def read_text_file(file_path, encoding='utf-8'):
     try:
