@@ -5,6 +5,7 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
+from concurrent.futures import ThreadPoolExecutor
 
 # Load environment variables 
 load_dotenv()
@@ -37,15 +38,15 @@ def get_embeddings(text):
     )
     return response['data'][0]['embedding']
 
-def upload_documents_to_pinecone(file_paths):
-    for file_path in file_paths:
+def upload_document_to_pinecone(file_path):
+    try:
         if file_path.endswith('.txt'):
             document_text = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
             document_text = read_pdf_file(file_path)
         else:
             st.error(f"Unsupported file format: {file_path}")
-            continue
+            return
         
         document_embedding = get_embeddings(document_text)
         document_id = os.path.basename(file_path)
@@ -54,6 +55,12 @@ def upload_documents_to_pinecone(file_paths):
             (document_id, document_embedding, {"text": document_text})
         ])
         st.success(f"Document '{document_id}' successfully added to Pinecone index.")
+    except Exception as e:
+        st.error(f"Error processing file {file_path}: {e}")
+
+def upload_documents_to_pinecone(file_paths):
+    with ThreadPoolExecutor() as executor:
+        executor.map(upload_document_to_pinecone, file_paths)
 
 st.title("Document Upload for Chartwell Insurance AI Database")
 
@@ -68,6 +75,7 @@ if st.button("Upload and Index Documents"):
                 f.write(uploaded_file.getbuffer())
             file_paths.append(file_path)
         
-        upload_documents_to_pinecone(file_paths)
+        with st.spinner('Uploading and indexing documents...'):
+            upload_documents_to_pinecone(file_paths)
     else:
         st.error("Please upload at least one file.")
