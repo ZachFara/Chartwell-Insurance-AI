@@ -1,7 +1,7 @@
 import streamlit as st
 import openai
 from pinecone import Pinecone
-from PyPDF2 import PdfFileReader
+from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
@@ -22,13 +22,13 @@ def read_text_file(file_path, encoding='utf-8'):
             return file.read()
 
 def read_pdf_file(file_path):
-    with open(file_path, 'rb') as file:
-        reader = PdfFileReader(file)
-        text = ""
-        for page_num in range(reader.numPages):
-            page = reader.getPage(page_num)
+    text = ""
+    with open(file_path, "rb") as file:
+        reader = PdfReader(file)
+        for page_num in range(len(reader.pages)):
+            page = reader.pages[page_num]
             text += page.extract_text()
-        return text
+    return text
 
 def get_embeddings(text):
     response = openai.Embedding.create(
