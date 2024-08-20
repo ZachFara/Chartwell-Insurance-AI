@@ -5,7 +5,7 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # Load environment variables 
 load_dotenv()
@@ -38,15 +38,14 @@ def get_embeddings(text):
     )
     return response['data'][0]['embedding']
 
-def upload_document_to_pinecone(file_path):
+def process_document(file_path):
     try:
         if file_path.endswith('.txt'):
             document_text = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
             document_text = read_pdf_file(file_path)
         else:
-            st.error(f"Unsupported file format: {file_path}")
-            return
+            return f"Unsupported file format: {file_path}", None
         
         document_embedding = get_embeddings(document_text)
         document_id = os.path.basename(file_path)
@@ -54,13 +53,18 @@ def upload_document_to_pinecone(file_path):
         index.upsert([
             (document_id, document_embedding, {"text": document_text})
         ])
-        st.success(f"Document '{document_id}' successfully added to Pinecone index.")
+        return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
-        st.error(f"Error processing file {file_path}: {e}")
+        return f"Error processing file {file_path}: {e}", None
 
 def upload_documents_to_pinecone(file_paths):
+    results = []
     with ThreadPoolExecutor() as executor:
-        executor.map(upload_document_to_pinecone, file_paths)
+        future_to_file = {executor.submit(process_document, file_path): file_path for file_path in file_paths}
+        for future in as_completed(future_to_file):
+            error, success = future.result()
+            results.append((error, success))
+    return results
 
 st.title("Document Upload for Chartwell Insurance AI Database")
 
@@ -76,6 +80,12 @@ if st.button("Upload and Index Documents"):
             file_paths.append(file_path)
         
         with st.spinner('Uploading and indexing documents...'):
-            upload_documents_to_pinecone(file_paths)
+            results = upload_documents_to_pinecone(file_paths)
+        
+        for error, success in results:
+            if error:
+                st.error(error)
+            if success:
+                st.success(success)
     else:
         st.error("Please upload at least one file.")
