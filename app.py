@@ -1,5 +1,6 @@
 import streamlit as st
-import openai
+from openai import OpenAI
+
 from pinecone import Pinecone
 from PyPDF2 import PdfReader
 import os
@@ -7,13 +8,21 @@ import io
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
+from utils.getting_embeddings import get_embeddings
+from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
 
 # Load environment variables 
 load_dotenv()
 
+primer = """You are a Q&A bot for an insurance company - Chartwell Insurance. A highly intelligent system that answers
+user questions based on the information provided by the user above
+each question. If the information cannot be found in the information
+provided by the user, you truthfully say 'I don't know'. When providing answers, your tone is like speaking for our company.
+"""
+
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("insurancedoc")
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 def read_text_file(file_path, encoding='utf-8'):
     try:
@@ -32,12 +41,7 @@ def read_pdf_file(file_path):
             text += page.extract_text()
     return text
 
-def get_embeddings(text):
-    response = openai.Embedding.create(
-        input=text,
-        model="text-embedding-ada-002"
-    )
-    return response['data'][0]['embedding']
+
 
 def clean_text(text):
     text = remove_substrings(text, {"/C20", "\n"}, " ")
@@ -55,12 +59,21 @@ def process_document(file_path):
         
         document_text = clean_text(document_text)
         
-        document_embedding = get_embeddings(document_text)
+        embeddings = get_embeddings(document_text, client)
         document_id = os.path.basename(file_path)
         
-        index.upsert([
-            (document_id, document_embedding, {"text": document_text})
-        ])
+        # Upsert each embedding into Pinecone
+        for i, embedding in enumerate(embeddings):
+            
+            print(embedding)
+            
+            DOCUMENT_LENGTH_LIMIT = 20_000
+            
+            if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the concatenated text exceeds the limit
+                document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
+            
+            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": document_text})])
+        
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
@@ -75,9 +88,17 @@ def upload_documents_to_pinecone(file_paths):
     return results
 
 def query_pinecone(query):
-    query_embedding = get_embeddings(query)
-    response = index.query(queries=[query_embedding], top_k=1)
-    return response['matches'][0]['metadata']['text'] if response['matches'] else "No relevant information found."
+    query_embedding = get_embeddings(query, client)[0]
+    
+    contexts = retrieve_contexts(index, query_embedding, 10)
+
+    # No filtering for now.    
+    
+    augmented_query = augment_query(query, contexts)
+    
+    response = generate_response(primer, augmented_query, client)
+        
+    return response
 
 
 st.title("Document Upload for Chartwell Insurance AI Database")
@@ -92,10 +113,10 @@ if st.button("Upload and Index Documents"):
             with open(file_path, "wb") as f:
                 f.write(uploaded_file.getbuffer())
             file_paths.append(file_path)
-        
+
         with st.spinner('Uploading and indexing documents...'):
             results = upload_documents_to_pinecone(file_paths)
-        
+
         for error, success in results:
             if error:
                 st.error(error)
