@@ -74,6 +74,12 @@ def upload_documents_to_pinecone(file_paths):
             results.append((error, success))
     return results
 
+def query_pinecone(query):
+    query_embedding = get_embeddings(query)
+    response = index.query(queries=[query_embedding], top_k=1)
+    return response['matches'][0]['metadata']['text'] if response['matches'] else "No relevant information found."
+
+
 st.title("Document Upload for Chartwell Insurance AI Database")
 
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
@@ -97,3 +103,11 @@ if st.button("Upload and Index Documents"):
                 st.success(success)
     else:
         st.error("Please upload at least one file.")
+
+# New section to query the AI
+st.header("Ask a Question")
+user_query = st.text_input("Enter your question:")
+if st.button("Submit Query"):
+    with st.spinner('Querying the AI...'):
+        answer = query_pinecone(user_query)
+    st.write("**Answer:**", answer)
