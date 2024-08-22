@@ -6,6 +6,7 @@ import os
 import io
 from dotenv import load_dotenv
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from utils.text_cleaning import remove_substrings, collapse_spaces
 
 # Load environment variables 
 load_dotenv()
@@ -38,6 +39,11 @@ def get_embeddings(text):
     )
     return response['data'][0]['embedding']
 
+def clean_text(text):
+    text = remove_substrings(text, {"/C20", "\n"}, " ")
+    text = collapse_spaces(text)
+    return text
+
 def process_document(file_path):
     try:
         if file_path.endswith('.txt'):
@@ -46,6 +52,8 @@ def process_document(file_path):
             document_text = read_pdf_file(file_path)
         else:
             return f"Unsupported file format: {file_path}", None
+        
+        document_text = clean_text(document_text)
         
         document_embedding = get_embeddings(document_text)
         document_id = os.path.basename(file_path)
