@@ -13,7 +13,7 @@ def augment_query(query, filtered_contexts):
 
 def generate_response(primer, augmented_query, client):
     res = openai.ChatCompletion.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": primer},
             {"role": "user", "content": augmented_query}
