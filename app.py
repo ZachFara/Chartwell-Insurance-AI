@@ -1,6 +1,5 @@
 import streamlit as st
-from openai import OpenAI
-
+import openai
 from pinecone import Pinecone
 from PyPDF2 import PdfReader
 import os
@@ -20,9 +19,12 @@ each question. If the information cannot be found in the information
 provided by the user, you truthfully say 'I don't know'. When providing answers, your tone is like speaking for our company.
 """
 
+# Initialize Pinecone client
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("insurancedoc")
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+# Initialize OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 def read_text_file(file_path, encoding='utf-8'):
     try:
@@ -41,8 +43,6 @@ def read_pdf_file(file_path):
             text += page.extract_text()
     return text
 
-
-
 def clean_text(text):
     text = remove_substrings(text, {"/C20", "\n"}, " ")
     text = collapse_spaces(text)
@@ -59,7 +59,7 @@ def process_document(file_path):
         
         document_text = clean_text(document_text)
         
-        embeddings = get_embeddings(document_text, client)
+        embeddings = get_embeddings(document_text, openai)
         document_id = os.path.basename(file_path)
         
         # Upsert each embedding into Pinecone
@@ -88,7 +88,7 @@ def upload_documents_to_pinecone(file_paths):
     return results
 
 def query_pinecone(query):
-    query_embedding = get_embeddings(query, client)[0]
+    query_embedding = get_embeddings(query, openai)[0]
     
     contexts = retrieve_contexts(index, query_embedding, 10)
 
@@ -96,10 +96,9 @@ def query_pinecone(query):
     
     augmented_query = augment_query(query, contexts)
     
-    response = generate_response(primer, augmented_query, client)
+    response = generate_response(primer, augmented_query, openai)
         
     return response
-
 
 st.title("Document Upload for Chartwell Insurance AI Database")
 
