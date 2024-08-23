@@ -1,4 +1,5 @@
 import tiktoken  # Used for counting tokens
+import openai
 
 def chunk_text(text, max_tokens=4000):
     # Initialize the tokenizer
@@ -20,11 +21,11 @@ def get_embeddings(text, client):
     embeddings = []
     
     for chunk in chunks:
-        response = client.embeddings.create(
+        response = openai.Embedding.create(
             input=chunk,
             model="text-embedding-ada-002"
         )
-        embeddings.append(response.data[0].embedding)
+        embeddings.append(response['data'][0]['embedding'])
     
     return embeddings
 
