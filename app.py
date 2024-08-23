@@ -22,7 +22,7 @@ provided by the user, you truthfully say 'I don't know'. When providing answers,
 
 pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
 index = pc.Index("insurancedoc")
-client = openai.api_key = os.getenv("OPENAI_API_KEY")
+client = os.getenv("OPENAI_API_KEY")
 
 def read_text_file(file_path, encoding='utf-8'):
     try:
