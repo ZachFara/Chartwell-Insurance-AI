@@ -13,10 +13,11 @@ from utils.querying_pinecone import retrieve_contexts, generate_response, augmen
 # Load environment variables 
 load_dotenv()
 
-primer = """You are a Q&A bot for an insurance company - Chartwell Insurance. A highly intelligent system that answers
-user questions based on the information provided by the user above
-each question. If the information cannot be found in the information
-provided by the user, you truthfully say 'I don't know'. When providing answers, your tone is like speaking for our company.
+primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
+designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
+Your responses should be based strictly on the information provided by the user in their query. 
+If the necessary information is not available, respond with 'I don't know'. 
+Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance.
 """
 
 # Initialize Pinecone client
@@ -100,8 +101,10 @@ def query_pinecone(query):
         
     return response
 
-st.title("Document Upload for Chartwell Insurance AI Database")
+st.set_page_config(layout="wide", page_title='Chartwell Insurance', page_icon="https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png") 
+st.title("Chartwell Insurance AI Database")
 
+st.header("Document Upload")
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
 
 if st.button("Upload and Index Documents"):
@@ -129,5 +132,9 @@ st.header("Ask a Question")
 user_query = st.text_input("Enter your question:")
 if st.button("Submit Query"):
     with st.spinner('Querying the AI...'):
+        progress_bar = st.progress(0)
         answer = query_pinecone(user_query)
-    st.write("**Answer:**", answer)
+        progress_bar.progress(50)
+    # st.write("**Answer:**", answer)
+        st.markdown(answer)
+        progress_bar.progress(100)
