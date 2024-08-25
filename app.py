@@ -100,8 +100,7 @@ def query_pinecone(query):
     response = generate_response(primer, augmented_query, openai)
         
     return response
-
-st.set_page_config(layout="wide", page_title='Chartwell Insurance', page_icon="https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png") 
+st.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
 st.title("Chartwell Insurance AI Database")
 
 st.header("Document Upload")
