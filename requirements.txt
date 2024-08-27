@@ -4,3 +4,4 @@ pinecone-client
 PyPDF2
 python-dotenv
 tiktoken
+pymupdf4llm

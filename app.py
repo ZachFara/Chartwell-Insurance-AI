@@ -9,7 +9,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
 from utils.getting_embeddings import get_embeddings
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
-
+import pymupdf4llm
 # Load environment variables 
 load_dotenv()
 
@@ -38,10 +38,11 @@ def read_text_file(file_path, encoding='utf-8'):
 def read_pdf_file(file_path):
     text = ""
     with open(file_path, "rb") as file:
-        reader = PdfReader(file)
-        for page_num in range(len(reader.pages)):
-            page = reader.pages[page_num]
-            text += page.extract_text()
+        text = pymupdf4llm.to_markdown(file_path)
+        # reader = PdfReader(file)
+        # for page_num in range(len(reader.pages)):
+        #     page = reader.pages[page_num]
+        #     text += page.extract_text()
     return text
 
 def clean_text(text):
