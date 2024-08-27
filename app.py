@@ -36,7 +36,7 @@ def read_text_file(file_path, encoding='utf-8'):
             return file.read()
 
 def read_pdf_file(file_path):
-    text = ""
+    # text = ""
     with open(file_path, "rb") as file:
         text = pymupdf4llm.to_markdown(file_path)
         # reader = PdfReader(file)
