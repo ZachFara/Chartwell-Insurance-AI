@@ -119,6 +119,7 @@ st.title("Chartwell Insurance AI Database")
 
 st.header("Document Upload")
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
+st.subheader("Currently, we support the upload of 1,000 pages per day, with a maximum of 1,200 pages per file.", divider="gray")
 
 if st.button("Upload and Index Documents"):
     if uploaded_files:
