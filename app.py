@@ -39,15 +39,6 @@ def read_text_file(file_path, encoding='utf-8'):
         with open(file_path, 'r', encoding='latin-1') as file:
             return file.read()
 
-# def read_pdf_file(file_path):
-#     text = ""
-#     with open(file_path, "rb") as file:
-#         reader = PdfReader(file)
-#         for page_num in range(len(reader.pages)):
-#             page = reader.pages[page_num]
-#             text += page.extract_text()
-#     return text
-
 def read_pdf_file(file_path):
     parser = LlamaParse(
         result_type="text",  # "markdown" and "text" are available
@@ -64,11 +55,6 @@ def read_pdf_file(file_path):
     except Exception as e:
         print(f"Error reading PDF file {file_path}: {e}")
         return None
-
-# def clean_text(text):
-#     text = remove_substrings(text, {"/C20", "\n"}, " ")
-#     text = collapse_spaces(text)
-#     return text
 
 def clean_text(text):
     if text is None:
@@ -162,6 +148,5 @@ if st.button("Submit Query"):
         progress_bar = st.progress(0)
         answer = query_pinecone(user_query)
         progress_bar.progress(50)
-    # st.write("**Answer:**", answer)
         st.markdown(answer)
         progress_bar.progress(100)
