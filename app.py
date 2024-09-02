@@ -5,17 +5,22 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
+import nest_asyncio
+nest_asyncio.apply()
+from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
 from utils.getting_embeddings import get_embeddings
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
-# Load environment variables 
+
+# Load environment variables, bring in LLAMA_CLOUD_API_KEY
 load_dotenv()
 
 primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
 designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
 Your responses should be based strictly on the information provided by the user in their query. 
-If the necessary information is not available, respond with 'I don't know'. 
+Use the following pieces of context to answer the question at the end in detail with clear explanation. 
+If you don't know the answer, just say that you don't know, don't try to make up an answer. 
 Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance.
 """
 
@@ -34,17 +39,41 @@ def read_text_file(file_path, encoding='utf-8'):
         with open(file_path, 'r', encoding='latin-1') as file:
             return file.read()
 
+# def read_pdf_file(file_path):
+#     text = ""
+#     with open(file_path, "rb") as file:
+#         reader = PdfReader(file)
+#         for page_num in range(len(reader.pages)):
+#             page = reader.pages[page_num]
+#             text += page.extract_text()
+#     return text
+
 def read_pdf_file(file_path):
-    text = ""
-    with open(file_path, "rb") as file:
-        reader = PdfReader(file)
-        for page_num in range(len(reader.pages)):
-            page = reader.pages[page_num]
-            text += page.extract_text()
-    return text
+    parser = LlamaParse(
+        result_type="text",  # "markdown" and "text" are available
+        verbose=False
+    )
+    
+    try:
+        with open(file_path, "rb") as file:
+            reader = parser.load_data(file, extra_info={"file_name": file_path})
+            if reader:
+                return reader[0].text
+            else:
+                return None
+    except Exception as e:
+        print(f"Error reading PDF file {file_path}: {e}")
+        return None
+
+# def clean_text(text):
+#     text = remove_substrings(text, {"/C20", "\n"}, " ")
+#     text = collapse_spaces(text)
+#     return text
 
 def clean_text(text):
-    text = remove_substrings(text, {"/C20", "\n"}, " ")
+    if text is None:
+        return None
+    text = remove_substrings(text, ["/C20", "\n"], " ")
     text = collapse_spaces(text)
     return text
 
