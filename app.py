@@ -28,13 +28,6 @@ index = pc.Index("insurancedoc")
 # Initialize OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# Initialize Pinecone client
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
-index = pc.Index("insurancedoc")
-
-# Initialize OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
 def read_text_file(file_path, encoding='utf-8'):
     try:
         with open(file_path, 'r', encoding=encoding) as file:
@@ -107,75 +100,45 @@ def query_pinecone(query):
     
     response = generate_response(primer, augmented_query, openai)
         
-    return response, contexts  # Return contexts for displaying document content
+    return response
 
-# Streamlit layout
-st.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
-st.title("Chartwell Insurance AI Database")
+# Streamlit App Layout
+st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
+st.sidebar.title("Chartwell Insurance AI Database")
 
-# Sidebar for file collection and quick upload
-st.sidebar.title("File Collection")
-st.sidebar.button("Search All")
-st.sidebar.text_input("Search In File(s)")
-st.sidebar.title("Quick Upload")
-uploaded_files_sidebar = st.sidebar.file_uploader("Drop File Here - or - Click to Upload", type=["txt", "pdf"], accept_multiple_files=True)
+st.sidebar.header("Navigation")
+page = st.sidebar.radio("Go to", ["Document Upload", "Ask a Question"])
 
-if st.sidebar.button("Upload and Index Documents (Sidebar)"):
-    if uploaded_files_sidebar:
-        file_paths = []
-        for uploaded_file in uploaded_files_sidebar:
-            file_path = os.path.join("/tmp", uploaded_file.name)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            file_paths.append(file_path)
+if page == "Document Upload":
+    st.header("Document Upload")
+    uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
 
-        with st.spinner('Uploading and indexing documents...'):
-            results = upload_documents_to_pinecone(file_paths)
+    if st.button("Upload and Index Documents"):
+        if uploaded_files:
+            file_paths = []
+            for uploaded_file in uploaded_files:
+                file_path = os.path.join("/tmp", uploaded_file.name)
+                with open(file_path, "wb") as f:
+                    f.write(uploaded_file.getbuffer())
+                file_paths.append(file_path)
 
-        for error, success in results:
-            if error:
-                st.sidebar.error(error)
-            if success:
-                st.sidebar.success(success)
-    else:
-        st.sidebar.error("Please upload at least one file.")
+            with st.spinner('Uploading and indexing documents...'):
+                results = upload_documents_to_pinecone(file_paths)
 
-# Main section for document upload
-st.header("Document Upload")
-uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
-
-if st.button("Upload and Index Documents"):
-    if uploaded_files:
-        file_paths = []
-        for uploaded_file in uploaded_files:
-            file_path = os.path.join("/tmp", uploaded_file.name)
-            with open(file_path, "wb") as f:
-                f.write(uploaded_file.getbuffer())
-            file_paths.append(file_path)
-
-        with st.spinner('Uploading and indexing documents...'):
-            results = upload_documents_to_pinecone(file_paths)
-
-        for error, success in results:
-            if error:
-                st.error(error)
-            if success:
-                st.success(success)
-    else:
-        st.error("Please upload at least one file.")
-
-# New section to query the AI
-st.header("Ask a Question")
-user_query = st.text_input("Enter your question:")
-if st.button("Submit Query"):
-    with st.spinner('Querying the AI...'):
-        progress_bar = st.progress(0)
-        answer, contexts = query_pinecone(user_query)
-        progress_bar.progress(50)
-        st.markdown(answer)
-        progress_bar.progress(100)
-
-# Footer with chat settings
-st.text_input("Chat input", placeholder="Type your message here...")
-st.button("Send")
-st.button("Regen")
+            for error, success in results:
+                if error:
+                    st.error(error)
+                if success:
+                    st.success(success)
+        else:
+            st.error("Please upload at least one file.")
+elif page == "Ask a Question":
+    st.header("Ask a Question")
+    user_query = st.text_input("Enter your question:")
+    if st.button("Submit Query"):
+        with st.spinner('Querying the AI...'):
+            progress_bar = st.progress(0)
+            answer = query_pinecone(user_query)
+            progress_bar.progress(50)
+            st.markdown(answer)
+            progress_bar.progress(100)
