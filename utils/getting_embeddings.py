@@ -1,12 +1,30 @@
 import tiktoken  # Used for counting tokens
 import openai
 
-def chunk_text(text, max_tokens=4000):
+# def chunk_text(text, max_tokens=4000):
+#     # Initialize the tokenizer
+#     enc = tiktoken.get_encoding("cl100k_base")
+    
+#     # Tokenize the entire text
+#     tokens = enc.encode(text)
+    
+#     # Split the tokens into chunks of max_tokens size
+#     token_chunks = [tokens[i:i + max_tokens] for i in range(0, len(tokens), max_tokens)]
+    
+#     # Convert each chunk of tokens back into text for embedding
+#     text_chunks = [enc.decode(chunk) for chunk in token_chunks]
+    
+#     return text_chunks
+
+def chunk_text(text, max_tokens=500):  # Reduced max_tokens for testing
     # Initialize the tokenizer
     enc = tiktoken.get_encoding("cl100k_base")
     
     # Tokenize the entire text
     tokens = enc.encode(text)
+    
+    # Debugging: Print the number of tokens
+    print(f"Number of tokens: {len(tokens)}")
     
     # Split the tokens into chunks of max_tokens size
     token_chunks = [tokens[i:i + max_tokens] for i in range(0, len(tokens), max_tokens)]
@@ -16,8 +34,7 @@ def chunk_text(text, max_tokens=4000):
     
     return text_chunks
 
-def get_embeddings(text, client):
-    chunks = chunk_text(text)
+def get_embeddings(chunks):
     embeddings = []
     
     for chunk in chunks:

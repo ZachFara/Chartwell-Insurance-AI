@@ -5,14 +5,14 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
-import nest_asyncio
-nest_asyncio.apply()
-from llama_parse import LlamaParse
+# import nest_asyncio
+# nest_asyncio.apply()
+# from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
 from utils.getting_embeddings import get_embeddings, chunk_text
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
-
+import fitz
 # Load environment variables, bring in LLAMA_CLOUD_API_KEY
 load_dotenv()
 
@@ -40,18 +40,13 @@ def read_text_file(file_path, encoding='utf-8'):
             return file.read()
 
 def read_pdf_file(file_path):
-    parser = LlamaParse(
-        result_type="text",  # "markdown" and "text" are available
-        verbose=False
-    )
-    
     try:
-        with open(file_path, "rb") as file:
-            reader = parser.load_data(file, extra_info={"file_name": file_path})
-            if reader:
-                return reader[0].text
-            else:
-                return None
+        doc = fitz.open(file_path)
+        text = ""
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            text += page.get_text()
+        return text
     except Exception as e:
         print(f"Error reading PDF file {file_path}: {e}")
         return None
@@ -74,12 +69,20 @@ def process_document(file_path):
         
         document_text = clean_text(document_text)
         
+        # Debugging: Print the length of the document text
+        print(f"Length of document text: {len(document_text)}")
+        
         text_chunks = chunk_text(document_text)  # Get the text chunks
-        embeddings = get_embeddings(document_text, openai)
+        embeddings = get_embeddings(text_chunks)  # Get embeddings for each chunk
         document_id = os.path.basename(file_path)
+        
+        # Debugging: Print the number of chunks and embeddings
+        print(f"Number of chunks: {len(text_chunks)}")
+        print(f"Number of embeddings: {len(embeddings)}")
         
         # Upsert each embedding into Pinecone
         for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings)):
+            print(f"Uploading chunk {i} for document {document_id}")
             index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": chunk})])
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
@@ -121,7 +124,7 @@ st.title("Chartwell Insurance AI Database")
 
 st.header("Document Upload")
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
-st.markdown('''Currently, we support the upload of 1,000 pages per day (1200 pages per file max)''')
+# st.markdown('''Currently, we support the upload of 1,000 pages per day (1200 pages per file max)''')
 
 if st.button("Upload and Index Documents"):
     if uploaded_files:
