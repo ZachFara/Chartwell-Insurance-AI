@@ -79,15 +79,8 @@ def process_document(file_path):
         
         # Upsert each embedding into Pinecone
         for i, embedding in enumerate(embeddings):
-            
-            print(embedding)
-            
-            DOCUMENT_LENGTH_LIMIT = 20_000
-            
-            if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the concatenated text exceeds the limit
-                document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
-            
-            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": document_text})])
+            chunk_text = chunk_text(document_text)[i]
+            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": chunk_text})])
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
