@@ -4,8 +4,3 @@ pinecone-client
 PyPDF2
 python-dotenv
 tiktoken
-pymupdf4llm
-llama-index-core
-llama-parse
-llama-index-readers-file
-fitz

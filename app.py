@@ -5,15 +5,12 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
-# import nest_asyncio
-# nest_asyncio.apply()
-# from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
-from utils.getting_embeddings import get_embeddings, chunk_text
+from utils.getting_embeddings import get_embeddings
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
-import fitz
-# Load environment variables, bring in LLAMA_CLOUD_API_KEY
+
+# Load environment variables 
 load_dotenv()
 
 primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
@@ -31,6 +28,13 @@ index = pc.Index("insurancedoc")
 # Initialize OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# Initialize Pinecone client
+pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+index = pc.Index("insurancedoc")
+
+# Initialize OpenAI API key
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
 def read_text_file(file_path, encoding='utf-8'):
     try:
         with open(file_path, 'r', encoding=encoding) as file:
@@ -40,21 +44,16 @@ def read_text_file(file_path, encoding='utf-8'):
             return file.read()
 
 def read_pdf_file(file_path):
-    try:
-        doc = fitz.open(file_path)
-        text = ""
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            text += page.get_text()
-        return text
-    except Exception as e:
-        print(f"Error reading PDF file {file_path}: {e}")
-        return None
+    text = ""
+    with open(file_path, "rb") as file:
+        reader = PdfReader(file)
+        for page_num in range(len(reader.pages)):
+            page = reader.pages[page_num]
+            text += page.extract_text()
+    return text
 
 def clean_text(text):
-    if text is None:
-        return None
-    text = remove_substrings(text, ["/C20", "\n"], " ")
+    text = remove_substrings(text, {"/C20", "\n"}, " ")
     text = collapse_spaces(text)
     return text
 
@@ -69,34 +68,24 @@ def process_document(file_path):
         
         document_text = clean_text(document_text)
         
-        # Debugging: Print the length of the document text
-        print(f"Length of document text: {len(document_text)}")
-        
-        text_chunks = chunk_text(document_text)  # Get the text chunks
-        embeddings = get_embeddings(text_chunks)  # Get embeddings for each chunk
+        embeddings = get_embeddings(document_text, openai)
         document_id = os.path.basename(file_path)
         
-        # Debugging: Print the number of chunks and embeddings
-        print(f"Number of chunks: {len(text_chunks)}")
-        print(f"Number of embeddings: {len(embeddings)}")
-        
         # Upsert each embedding into Pinecone
-        for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings)):
-            print(f"Uploading chunk {i} for document {document_id}")
-            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": chunk})])
+        for i, embedding in enumerate(embeddings):
+            
+            print(embedding)
+            
+            DOCUMENT_LENGTH_LIMIT = 20_000
+            
+            if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the concatenated text exceeds the limit
+                document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
+            
+            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": document_text})])
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
-
-def upload_documents_to_pinecone(file_paths):
-    results = []
-    with ThreadPoolExecutor() as executor:
-        future_to_file = {executor.submit(process_document, file_path): file_path for file_path in file_paths}
-        for future in as_completed(future_to_file):
-            error, success = future.result()
-            results.append((error, success))
-    return results
 
 def upload_documents_to_pinecone(file_paths):
     results = []
@@ -124,7 +113,6 @@ st.title("Chartwell Insurance AI Database")
 
 st.header("Document Upload")
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
-# st.markdown('''Currently, we support the upload of 1,000 pages per day (1200 pages per file max)''')
 
 if st.button("Upload and Index Documents"):
     if uploaded_files:
