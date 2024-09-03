@@ -107,10 +107,40 @@ def query_pinecone(query):
     
     response = generate_response(primer, augmented_query, openai)
         
-    return response
+    return response, contexts  # Return contexts for displaying document content
+
+# Streamlit layout
 st.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
 st.title("Chartwell Insurance AI Database")
 
+# Sidebar for file collection and quick upload
+st.sidebar.title("File Collection")
+st.sidebar.button("Search All")
+st.sidebar.text_input("Search In File(s)")
+st.sidebar.title("Quick Upload")
+uploaded_files_sidebar = st.sidebar.file_uploader("Drop File Here - or - Click to Upload", type=["txt", "pdf"], accept_multiple_files=True)
+
+if st.sidebar.button("Upload and Index Documents (Sidebar)"):
+    if uploaded_files_sidebar:
+        file_paths = []
+        for uploaded_file in uploaded_files_sidebar:
+            file_path = os.path.join("/tmp", uploaded_file.name)
+            with open(file_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            file_paths.append(file_path)
+
+        with st.spinner('Uploading and indexing documents...'):
+            results = upload_documents_to_pinecone(file_paths)
+
+        for error, success in results:
+            if error:
+                st.sidebar.error(error)
+            if success:
+                st.sidebar.success(success)
+    else:
+        st.sidebar.error("Please upload at least one file.")
+
+# Main section for document upload
 st.header("Document Upload")
 uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
 
@@ -140,7 +170,12 @@ user_query = st.text_input("Enter your question:")
 if st.button("Submit Query"):
     with st.spinner('Querying the AI...'):
         progress_bar = st.progress(0)
-        answer = query_pinecone(user_query)
+        answer, contexts = query_pinecone(user_query)
         progress_bar.progress(50)
         st.markdown(answer)
         progress_bar.progress(100)
+
+# Footer with chat settings
+st.text_input("Chat input", placeholder="Type your message here...")
+st.button("Send")
+st.button("Regen")
