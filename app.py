@@ -10,7 +10,7 @@ nest_asyncio.apply()
 from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
-from utils.getting_embeddings import get_embeddings
+from utils.getting_embeddings import get_embeddings, chunk_text
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
 
 # Load environment variables, bring in LLAMA_CLOUD_API_KEY
@@ -74,17 +74,26 @@ def process_document(file_path):
         
         document_text = clean_text(document_text)
         
+        text_chunks = chunk_text(document_text)  # Get the text chunks
         embeddings = get_embeddings(document_text, openai)
         document_id = os.path.basename(file_path)
         
         # Upsert each embedding into Pinecone
-        for i, embedding in enumerate(embeddings):
-            chunk_text = chunk_text(document_text)[i]
-            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": chunk_text})])
+        for i, (chunk, embedding) in enumerate(zip(text_chunks, embeddings)):
+            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": chunk})])
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
+
+def upload_documents_to_pinecone(file_paths):
+    results = []
+    with ThreadPoolExecutor() as executor:
+        future_to_file = {executor.submit(process_document, file_path): file_path for file_path in file_paths}
+        for future in as_completed(future_to_file):
+            error, success = future.result()
+            results.append((error, success))
+    return results
 
 def upload_documents_to_pinecone(file_paths):
     results = []
