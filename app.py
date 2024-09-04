@@ -5,6 +5,9 @@ from PyPDF2 import PdfReader
 import os
 import io
 from dotenv import load_dotenv
+import nest_asyncio
+nest_asyncio.apply()
+from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import remove_substrings, collapse_spaces
 from utils.getting_embeddings import get_embeddings
@@ -15,10 +18,11 @@ load_dotenv()
 
 primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
 designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
-Your responses should be based strictly on the information provided by the user in their query. 
-Use the following pieces of context to answer the question at the end in detail with clear explanation. 
-If you don't know the answer, just say that you don't know, don't try to make up an answer. 
-Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance.
+Your responses should be based strictly on the information provided by the user in their query and the given context. 
+Use the following pieces of context to answer the question at the end in detail with clear explanations. 
+If you don't know the answer, explicitly state that you don't know, and do not attempt to fabricate an answer. 
+Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance. 
+Be concise yet thorough in your explanations.
 """
 
 # Initialize Pinecone client
@@ -28,6 +32,11 @@ index = pc.Index("insurancedoc")
 # Initialize OpenAI API key
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+# # Initialize LlamaParse
+llama_parser = LlamaParse(result_type="markdown")
+
+#------------------Document Processing
+
 def read_text_file(file_path, encoding='utf-8'):
     try:
         with open(file_path, 'r', encoding=encoding) as file:
@@ -35,15 +44,10 @@ def read_text_file(file_path, encoding='utf-8'):
     except UnicodeDecodeError:
         with open(file_path, 'r', encoding='latin-1') as file:
             return file.read()
-
+        
 def read_pdf_file(file_path):
-    text = ""
-    with open(file_path, "rb") as file:
-        reader = PdfReader(file)
-        for page_num in range(len(reader.pages)):
-            page = reader.pages[page_num]
-            text += page.extract_text()
-    return text
+    documents = llama_parser.load_data(file_path)
+    return [doc.text for doc in documents]
 
 def clean_text(text):
     text = remove_substrings(text, {"/C20", "\n"}, " ")
@@ -53,28 +57,28 @@ def clean_text(text):
 def process_document(file_path):
     try:
         if file_path.endswith('.txt'):
-            document_text = read_text_file(file_path)
+            document_texts = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
-            document_text = read_pdf_file(file_path)
+            document_texts = read_pdf_file(file_path)
         else:
             return f"Unsupported file format: {file_path}", None
         
-        document_text = clean_text(document_text)
-        
-        embeddings = get_embeddings(document_text, openai)
         document_id = os.path.basename(file_path)
         
-        # Upsert each embedding into Pinecone
-        for i, embedding in enumerate(embeddings):
+        for i, document_text in enumerate(document_texts):
+            document_text = clean_text(document_text)
+            embeddings = get_embeddings(document_text, openai)
             
-            print(embedding)
-            
-            DOCUMENT_LENGTH_LIMIT = 20_000
-            
-            if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the concatenated text exceeds the limit
-                document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
-            
-            index.upsert([(f"{document_id}_chunk_{i}", embedding, {"text": document_text})])
+            # Upsert each embedding into Pinecone
+            for j, embedding in enumerate(embeddings):
+                print(embedding)
+                
+                DOCUMENT_LENGTH_LIMIT = 20_000
+                
+                if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the text exceeds the limit
+                    document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
+                
+                index.upsert([(f"{document_id}_chunk_{i}_{j}", embedding, {"text": document_text})])
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
@@ -89,6 +93,7 @@ def upload_documents_to_pinecone(file_paths):
             results.append((error, success))
     return results
 
+#------------------Querying Pinecone
 def query_pinecone(query):
     query_embedding = get_embeddings(query, openai)[0]
     
@@ -102,7 +107,7 @@ def query_pinecone(query):
         
     return response
 
-# Streamlit App Layout
+#------------------Streamlit Interface
 st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
 st.sidebar.title("Chartwell Insurance AI Database")
 
@@ -112,7 +117,8 @@ page = st.sidebar.radio("Go to", ["Document Upload", "Ask a Question"])
 if page == "Document Upload":
     st.header("Document Upload")
     uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
-
+    st.caption("""
+    Right now, we only support upload 1000 pages per day (1200 pages per file max)""")
     if st.button("Upload and Index Documents"):
         if uploaded_files:
             file_paths = []
@@ -140,5 +146,12 @@ elif page == "Ask a Question":
             progress_bar = st.progress(0)
             answer = query_pinecone(user_query)
             progress_bar.progress(50)
-            st.markdown(answer)
+            
+            # Debug the response
+            print(answer)
+            
+            # Sanitize the response
+            sanitized_answer = answer.replace('\n', '  \n')  # Ensure newlines are treated as line breaks in Markdown
+            
+            st.markdown(sanitized_answer)
             progress_bar.progress(100)
