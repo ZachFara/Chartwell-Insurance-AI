@@ -8,3 +8,4 @@ llama-index
 llama_parse
 langchain-community
 langchain-core
+pkg_resources
