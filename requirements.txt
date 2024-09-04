@@ -4,8 +4,7 @@ pinecone-client
 PyPDF2
 python-dotenv
 tiktoken
-llama-index
-llama_parse
 langchain-community
-langchain-core
-pkg_resources
+llama-index-core
+llama-parse
+llama-index-readers-file
