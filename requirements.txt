@@ -6,3 +6,5 @@ python-dotenv
 tiktoken
 llama-index
 llama_parse
+langchain-community
+langchain-core
