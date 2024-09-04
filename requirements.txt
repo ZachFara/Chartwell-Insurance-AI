@@ -5,3 +5,4 @@ PyPDF2
 python-dotenv
 tiktoken
 llama-index
+llama_parse
