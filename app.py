@@ -110,17 +110,24 @@ def query_pinecone(query):
     return response
 
 #------------------Streamlit Interface
-st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png")
-st.sidebar.title("Chartwell Insurance AI Database")
+st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png", use_column_width=True)
+st.sidebar.title("Chartwell Insurance AI Assistant")
 
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Document Upload", "Ask a Question"])
+page = st.sidebar.radio("Go to", ["Document Upload", "Ask a Question", "FAQ"])
 
 if page == "Document Upload":
-    st.header("Document Upload")
-    uploaded_files = st.file_uploader("Choose files", type=["txt", "pdf"], accept_multiple_files=True)
-    st.caption("""
-    Right now, we only support upload 1000 pages per day (1200 pages per file max)""")
+    st.header("📄 Document Upload")
+    st.write("Upload your documents below to add them to the AI assistant's knowledge base.")
+
+    uploaded_files = st.file_uploader(
+        "Choose TXT or PDF files",
+        type=["txt", "pdf"],
+        accept_multiple_files=True,
+        help="You can upload multiple files at once."
+    )
+    st.caption("Currently, we support uploading up to **1000 pages per day** (1200 pages per file max).")
+
     if st.button("Upload and Index Documents"):
         if uploaded_files:
             file_paths = []
@@ -129,9 +136,12 @@ if page == "Document Upload":
                 with open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 file_paths.append(file_path)
+                st.success(f"Uploaded `{uploaded_file.name}`")
 
             with st.spinner('Uploading and indexing documents...'):
+                progress_bar = st.progress(0)
                 results = upload_documents_to_pinecone(file_paths)
+                progress_bar.progress(100)
 
             for error, success in results:
                 if error:
@@ -139,21 +149,64 @@ if page == "Document Upload":
                 if success:
                     st.success(success)
         else:
-            st.error("Please upload at least one file.")
+            st.warning("Please upload at least one file.")
+
 elif page == "Ask a Question":
-    st.header("Ask a Question")
-    user_query = st.text_input("Enter your question:")
+    st.header("❓ Ask a Question")
+    st.write("Enter your question below, and our AI assistant will provide a detailed response.")
+
+    user_query = st.text_area("Your Question:", height=150, placeholder="Type your question here...")
     if st.button("Submit Query"):
-        with st.spinner('Querying the AI...'):
-            progress_bar = st.progress(0)
-            answer = query_pinecone(user_query)
-            progress_bar.progress(50)
-            
-            # Debug the response
-            print(answer)
-            
-            # Sanitize the response
-            sanitized_answer = answer.replace('\n', '  \n')  # Ensure newlines are treated as line breaks in Markdown
-            
-            st.markdown(sanitized_answer)
-            progress_bar.progress(100)
+        if user_query.strip() == "":
+            st.warning("Please enter a question before submitting.")
+        else:
+            with st.spinner('The AI assistant is formulating a response...'):
+                progress_bar = st.progress(0)
+                answer = query_pinecone(user_query)
+                progress_bar.progress(50)
+
+                # Sanitize and display the response
+                sanitized_answer = answer.replace('\n', '  \n')
+                st.markdown(f"### 📝 Answer:\n{sanitized_answer}")
+                progress_bar.progress(100)
+    def add_footer():
+        st.markdown("""
+        ---
+        © 2024 Chartwell Insurance. All rights reserved.
+                    
+        **Disclaimer:** Chartwell Insurance AI can make mistakes. Check important info.
+        """, unsafe_allow_html=True)
+
+    add_footer()
+
+elif page == "FAQ":
+    st.header("Frequently Asked Questions")
+
+    faqs = [
+        {
+            "question": "How do I upload a document?",
+            "answer": "Go to the 'Document Upload' page and select your files to upload."
+        },
+        {
+            "question": "What types of files are supported?",
+            "answer": "Currently, we support .txt and .pdf files."
+        },
+        {
+            "question": "How can I ask a question?",
+            "answer": "Navigate to the 'Ask a Question' page and enter your query in the text area."
+        },
+        {
+            "question": "What is the page limit for document uploads?",
+            "answer": "We support uploading up to 1,000 pages per day, with a maximum of 1,200 pages per file."
+        },
+        # Add more FAQs as needed
+    ]
+
+    filtered_faqs = faqs
+
+    if filtered_faqs:
+        for faq in filtered_faqs:
+            with st.expander(faq["question"]):
+                st.write(faq["answer"])
+    else:
+        st.write("No FAQs found matching your search query.")

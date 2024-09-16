@@ -8,3 +8,4 @@ langchain-community
 llama-index-core
 llama-parse
 llama-index-readers-file
+spacy
