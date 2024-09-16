@@ -1,0 +1,11 @@
+streamlit
+openai==0.28
+pinecone-client
+PyPDF2
+python-dotenv
+tiktoken
+langchain-community
+llama-index-core
+llama-parse
+llama-index-readers-file
+spacy
