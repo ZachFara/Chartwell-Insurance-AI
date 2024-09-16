@@ -23,6 +23,8 @@ Use the following pieces of context to answer the question at the end in detail 
 If you don't know the answer, explicitly state that you don't know, and do not attempt to fabricate an answer. 
 Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance. 
 Be concise yet thorough in your explanations.
+Lastly, make sure to always follow the tone and structure of a customer service email.
+If there is a name presented to you within your prompt make sure to address the email to that person.
 """
 
 # Initialize Pinecone client
@@ -97,7 +99,7 @@ def upload_documents_to_pinecone(file_paths):
 def query_pinecone(query):
     query_embedding = get_embeddings(query, openai)[0]
     
-    contexts = retrieve_contexts(index, query_embedding, 10)
+    contexts = retrieve_contexts(index, query_embedding, 20)
 
     # No filtering for now.    
     
