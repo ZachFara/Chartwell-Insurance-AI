@@ -37,9 +37,7 @@ index = pc.Index("insurancedoc")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # # Initialize LlamaParse
-llama_parser = LlamaParse(
-    api_key=openai.api_key, # Added api_key, this change might be unecessary
-    result_type="markdown")
+llama_parser = LlamaParse(result_type="markdown")
 
 #------------------Document Processing
 
