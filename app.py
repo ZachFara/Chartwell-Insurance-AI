@@ -2,6 +2,7 @@ import streamlit as st
 import openai
 from pinecone import Pinecone
 from PyPDF2 import PdfReader
+from docx2pdf import convert as docx_to_pdf
 import os
 import io
 from dotenv import load_dotenv
@@ -25,6 +26,7 @@ Always maintain a professional and courteous tone, as if you are representing Ch
 Be concise yet thorough in your explanations.
 Lastly, make sure to always follow the tone and structure of a customer service email.
 If there is a name presented to you within your prompt make sure to address the email to that person.
+If there is no name presented then make sure to include a place to insert [CUSTOMER NAME]
 """
 
 # Initialize Pinecone client
@@ -35,7 +37,9 @@ index = pc.Index("insurancedoc")
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # # Initialize LlamaParse
-llama_parser = LlamaParse(result_type="markdown")
+llama_parser = LlamaParse(
+    api_key=openai.api_key, # Added api_key, this change might be unecessary
+    result_type="markdown")
 
 #------------------Document Processing
 
@@ -58,10 +62,14 @@ def clean_text(text):
 
 def process_document(file_path):
     try:
+        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf' # Make a destination path, this will hold the path of the pdf file if we have to perform a conversion
         if file_path.endswith('.txt'):
             document_texts = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
             document_texts = read_pdf_file(file_path)
+        elif file_path.endswith('.docx'):
+            docx_to_pdf(file_path, pdf_path)
+            document_texts = read_pdf_file(pdf_path)
         else:
             return f"Unsupported file format: {file_path}", None
         
@@ -78,6 +86,7 @@ def process_document(file_path):
                 DOCUMENT_LENGTH_LIMIT = 20_000
                 
                 if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the text exceeds the limit
+                    print("Metadata length limit exceeded, cutting the length short and upserting to pinecone with some text removed!")
                     document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
                 
                 index.upsert([(f"{document_id}_chunk_{i}_{j}", embedding, {"text": document_text})])
@@ -168,7 +177,14 @@ elif page == "Ask a Question":
                 # Sanitize and display the response
                 sanitized_answer = answer.replace('\n', '  \n')
                 st.markdown(f"### 📝 Answer:\n{sanitized_answer}")
-                progress_bar.progress(100)
+                # num_lines = int(sanitized_answer.count('\n') * 1.75 + 1)
+                # estimated_height = num_lines * 20
+                # min_height = 100
+                # adaptive_height = max(estimated_height, min_height)
+                
+                # st.markdown(f"### 📝 Answer:")
+                # st.text_area("AI Assistant's Response:", value=sanitized_answer, height=adaptive_height, disabled=True)
+                # progress_bar.progress(100)
     def add_footer():
         st.markdown("""
         ---
