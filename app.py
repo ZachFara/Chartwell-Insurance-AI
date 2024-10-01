@@ -87,7 +87,15 @@ def process_document(file_path):
                     print("Metadata length limit exceeded, cutting the length short and upserting to pinecone with some text removed!")
                     document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
                 
-                index.upsert([(f"{document_id}_chunk_{i}_{j}", embedding, {"text": document_text})])
+                index.upsert(
+                vectors=[
+                    {
+                        "id": f"{document_id}_chunk_{i}_{j}",
+                        "values": embedding,
+                        "metadata": {"text": document_text}
+                    }
+                ]
+            )
         
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
