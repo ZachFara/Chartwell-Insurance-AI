@@ -129,14 +129,32 @@ def query_pinecone(query, conversation_history):
     return response
 
 def copy_to_clipboard(text):
-    # Ensure button is rendered and visible
-    copy_button = Button(label="Copy to Clipboard")
+    # <button class="bk bk-btn bk-btn-default" type="button">Copy</button>
+    
+    st.markdown("""
+        <style>
+        .bk, .bk-btn, .bk-btn-default {
+            background-color: #2A5CAA !important;
+            border: none !important;
+            color: white !important;
+            padding: 0 !important; /* Remove extra padding */
+            font-size: 14px !important;
+            cursor: pointer !important;
+            border-radius: 5px !important;
+            width: 50px !important;  /* Set fixed width */
+            height: 35px !important;  /* Set fixed height */
+            display: inline-flex !important;  /* Ensure proper inline display */
+            justify-content: center;  /* Center text horizontally */
+            align-items: center;  /* Center text vertically */
+        }
+        </style>
+        """, unsafe_allow_html=True)
+    
+    copy_button = Button(label="Copy")
     copy_button.js_on_event("button_click", CustomJS(args=dict(text=text), code="""
         navigator.clipboard.writeText(text);
-        """))
+    """))
     
-    # Render the button
-    st.write("Click the button below to copy the response:")
     st.bokeh_chart(copy_button)
 
 def clear_conversation():
