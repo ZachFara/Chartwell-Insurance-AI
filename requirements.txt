@@ -1,5 +1,7 @@
 streamlit
 pinecone-client
+bokeh
+streamlit-bokeh-events
 PyPDF2
 python-dotenv
 tiktoken
