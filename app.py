@@ -8,6 +8,7 @@ import io
 from dotenv import load_dotenv
 import nest_asyncio
 import time
+import pyperclip
 nest_asyncio.apply()
 from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -206,6 +207,10 @@ elif page == "Chatbot":
             
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
+            if st.button("Copy to clipboard"):
+                pyperclip.copy(full_response)
+                st.success("Response copied to clipboard!")
+            
         # Add a button to clear the conversation
     if st.sidebar.button("Clear Conversation", on_click=clear_conversation):
         st.rerun()
