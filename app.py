@@ -7,6 +7,7 @@ import os
 import io
 from dotenv import load_dotenv
 import nest_asyncio
+import time
 nest_asyncio.apply()
 from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -111,25 +112,26 @@ def upload_documents_to_pinecone(file_paths):
     return results
 
 #------------------Querying Pinecone
-def query_pinecone(query):
+def query_pinecone(query, conversation_history):
     query_embedding = get_embeddings(query, openai)[0]
-    
     contexts = retrieve_contexts(index, query_embedding, 20)
-
-    # No filtering for now.    
     
-    augmented_query = augment_query(query, contexts)
+    # Combine the current query with conversation history
+    full_context = "\n".join(conversation_history) + "\n" + query
+    augmented_query = augment_query(full_context, contexts)
     
     response = generate_response(primer, augmented_query, openai)
-        
     return response
+
+def clear_conversation():
+    st.session_state.messages = []
 
 #------------------Streamlit Interface
 st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png", use_column_width=True)
 st.sidebar.title("Chartwell Insurance AI Assistant")
 
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Document Upload", "Ask a Question", "FAQ"])
+page = st.sidebar.radio("Go to", ["Document Upload", "Chatbot", "FAQ"])
 
 if page == "Document Upload":
     st.header("📄 Document Upload")
@@ -166,31 +168,48 @@ if page == "Document Upload":
         else:
             st.warning("Please upload at least one file.")
 
-elif page == "Ask a Question":
-    st.header("❓ Ask a Question")
-    st.write("Enter your question below, and our AI assistant will provide a detailed response.")
+elif page == "Chatbot":
+    # Initialize chat history
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
 
-    user_query = st.text_area("Your Question:", height=150, placeholder="Type your question here...")
-    if st.button("Submit Query"):
-        if user_query.strip() == "":
-            st.warning("Please enter a question before submitting.")
-        else:
-            with st.spinner('The AI assistant is formulating a response...'):
-                progress_bar = st.progress(0)
-                answer = query_pinecone(user_query)
-                progress_bar.progress(50)
+    # Chat container
+    chat_container = st.container()
 
-                # Sanitize and display the response
-                sanitized_answer = answer.replace('\n', '  \n')
-                st.markdown(f"### 📝 Answer:\n{sanitized_answer}")
-                # num_lines = int(sanitized_answer.count('\n') * 1.75 + 1)
-                # estimated_height = num_lines * 20
-                # min_height = 100
-                # adaptive_height = max(estimated_height, min_height)
+    with chat_container:
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"], avatar="🧑‍💼" if message["role"] == "user" else "🤖"):
+                st.markdown(message["content"])
+
+    # User input
+    user_input = st.chat_input("Type your question here...")
+
+    if user_input:
+        st.session_state.messages.append({"role": "user", "content": user_input})
+        with st.chat_message("user", avatar="🧑‍💼"):
+            st.markdown(user_input)
+
+        with st.chat_message("assistant", avatar="🤖"):
+            message_placeholder = st.empty()
+            full_response = ""
+            
+            conversation_history = [msg["content"] for msg in st.session_state.messages[-5:]]
+            
+            with st.spinner('Processing your request...'):
+                response = query_pinecone(user_input, conversation_history)
                 
-                # st.markdown(f"### 📝 Answer:")
-                # st.text_area("AI Assistant's Response:", value=sanitized_answer, height=adaptive_height, disabled=True)
-                # progress_bar.progress(100)
+                for chunk in response.split():
+                    full_response += chunk + " "
+                    time.sleep(0.05)
+                    message_placeholder.markdown(full_response + "▌")
+                message_placeholder.markdown(full_response)
+            
+            st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+        # Add a button to clear the conversation
+    if st.sidebar.button("Clear Conversation", on_click=clear_conversation):
+        st.rerun()
+
     def add_footer():
         st.markdown("""
         ---
