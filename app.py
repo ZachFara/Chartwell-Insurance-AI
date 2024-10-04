@@ -8,7 +8,11 @@ import io
 from dotenv import load_dotenv
 import nest_asyncio
 import time
-import pyperclip
+import streamlit as st
+from bokeh.models.widgets import Button
+from bokeh.models import CustomJS
+from streamlit_bokeh_events import streamlit_bokeh_events
+import time
 nest_asyncio.apply()
 from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -124,6 +128,17 @@ def query_pinecone(query, conversation_history):
     response = generate_response(primer, augmented_query, openai)
     return response
 
+def copy_to_clipboard(text):
+    # Ensure button is rendered and visible
+    copy_button = Button(label="Copy to Clipboard")
+    copy_button.js_on_event("button_click", CustomJS(args=dict(text=text), code="""
+        navigator.clipboard.writeText(text);
+        """))
+    
+    # Render the button
+    st.write("Click the button below to copy the response:")
+    st.bokeh_chart(copy_button)
+
 def clear_conversation():
     st.session_state.messages = []
 
@@ -207,9 +222,7 @@ elif page == "Chatbot":
             
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
-            if st.button("Copy to clipboard"):
-                pyperclip.copy(full_response)
-                st.success("Response copied to clipboard!")
+            copy_to_clipboard(full_response)
             
         # Add a button to clear the conversation
     if st.sidebar.button("Clear Conversation", on_click=clear_conversation):
