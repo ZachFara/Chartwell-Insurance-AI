@@ -32,7 +32,7 @@ Always maintain a professional and courteous tone, as if you are representing Ch
 Be concise yet thorough in your explanations.
 Lastly, make sure to always follow the tone and structure of a customer service email.
 If there is a name presented to you within your prompt make sure to address the email to that person.
-If there is no name presented then make sure to include a place to insert [CUSTOMER NAME]
+Do not include email headers, greetings, or signatures in your response.
 """
 
 # Initialize Pinecone client
@@ -206,6 +206,22 @@ elif page == "Chatbot":
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
+    # Sidebar input for email details
+    subject = st.sidebar.text_input("Email Subject", value="Your Subject Here")
+    recipient = st.sidebar.text_input("Recipient Name", value="Recipient")
+    sender = st.sidebar.text_input("Your Name", value="Your Name")
+
+    # Function to format assistant's response as an email
+    def format_as_email(content, subject=subject, recipient=recipient, sender=sender):
+        email_content = (
+            f"Subject: {subject}\n\n"
+            f"Dear {recipient},\n\n"
+            f"{content}\n\n"
+            "Best regards,\n"
+            f"{sender}"
+        )
+        return email_content
+
     # Chat container
     chat_container = st.container()
 
@@ -228,7 +244,7 @@ elif page == "Chatbot":
 
             # Show the spinner while processing the response
             conversation_history = [msg["content"] for msg in st.session_state.messages[-5:]]
-            
+
             with st.spinner('🤖 Assistant is processing your request...'):
                 response = query_pinecone(user_input, conversation_history)
 
@@ -236,13 +252,16 @@ elif page == "Chatbot":
                     full_response += chunk + " "
                     time.sleep(0.05)
                     message_placeholder.markdown(full_response + "▌")
-                message_placeholder.markdown(full_response)
+                
+                # Format the response as an email
+                email_ready_response = format_as_email(full_response)
+                message_placeholder.markdown(email_ready_response)
             
-            # Append the assistant's response to the session messages
-            st.session_state.messages.append({"role": "assistant", "content": full_response})
+            # Append the assistant's email-formatted response to the session messages
+            st.session_state.messages.append({"role": "assistant", "content": email_ready_response})
 
-            # Optional: Copy the response to clipboard
-            copy_to_clipboard(full_response)
+            # Optional: Copy the email-formatted response to clipboard
+            copy_to_clipboard(email_ready_response)
 
     # Sidebar button to clear the conversation
     if st.sidebar.button("🗑️ Clear Conversation", on_click=clear_conversation):
@@ -259,6 +278,7 @@ elif page == "Chatbot":
         """, unsafe_allow_html=True)
 
     add_footer()
+
 
 
 elif page == "FAQ":
