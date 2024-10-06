@@ -203,7 +203,6 @@ if page == "Document Upload":
             st.warning("Please upload at least one file.")
 
 elif page == "Chatbot":
-    # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
@@ -213,7 +212,7 @@ elif page == "Chatbot":
     with chat_container:
         for message in st.session_state.messages:
             with st.chat_message(message["role"], avatar="🧑‍💼" if message["role"] == "user" else "🤖"):
-                st.markdown(message["content"])
+                st.markdown(f"**{message['role'].capitalize()}**: {message['content']}")
 
     # User input
     user_input = st.chat_input("Type your question here...")
@@ -221,40 +220,46 @@ elif page == "Chatbot":
     if user_input:
         st.session_state.messages.append({"role": "user", "content": user_input})
         with st.chat_message("user", avatar="🧑‍💼"):
-            st.markdown(user_input)
+            st.markdown(f"**You**: {user_input}")
 
         with st.chat_message("assistant", avatar="🤖"):
             message_placeholder = st.empty()
             full_response = ""
-            
+
+            # Show the spinner while processing the response
             conversation_history = [msg["content"] for msg in st.session_state.messages[-5:]]
             
-            with st.spinner('Processing your request...'):
+            with st.spinner('🤖 Assistant is processing your request...'):
                 response = query_pinecone(user_input, conversation_history)
-                
+
                 for chunk in response.split():
                     full_response += chunk + " "
                     time.sleep(0.05)
                     message_placeholder.markdown(full_response + "▌")
                 message_placeholder.markdown(full_response)
             
+            # Append the assistant's response to the session messages
             st.session_state.messages.append({"role": "assistant", "content": full_response})
 
+            # Optional: Copy the response to clipboard
             copy_to_clipboard(full_response)
-            
-        # Add a button to clear the conversation
-    if st.sidebar.button("Clear Conversation", on_click=clear_conversation):
+
+    # Sidebar button to clear the conversation
+    if st.sidebar.button("🗑️ Clear Conversation", on_click=clear_conversation):
         st.rerun()
 
+    # Footer with disclaimer
     def add_footer():
         st.markdown("""
         ---
-        © 2024 Chartwell Insurance. All rights reserved.
-                    
-        **Disclaimer:** Chartwell Insurance AI can make mistakes. Check important info.
+        <div style='text-align: center;'>
+            <p>© 2024 <strong>Chartwell Insurance</strong>. All rights reserved.</p>
+            <p><i>Disclaimer: Chartwell Insurance AI is a tool and may provide inaccurate information. Always verify important details.</i></p>
+        </div>
         """, unsafe_allow_html=True)
 
     add_footer()
+
 
 elif page == "FAQ":
     st.header("Frequently Asked Questions")

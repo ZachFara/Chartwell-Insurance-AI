@@ -1,6 +1,6 @@
 streamlit
 pinecone-client
-bokeh
+bokeh==2.4.3
 streamlit-bokeh-events
 PyPDF2
 python-dotenv
