@@ -23,7 +23,7 @@ def get_embeddings(text, client):
     for chunk in chunks:
         response = openai.Embedding.create(
             input=chunk,
-            model="text-embedding-ada-002"
+            model="text-embedding-3-small"
         )
         embeddings.append(response['data'][0]['embedding'])
     
