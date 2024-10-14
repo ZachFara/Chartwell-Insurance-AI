@@ -249,37 +249,72 @@ elif page == "Chatbot":
             with st.spinner('🤖 Assistant is processing your request...'):
                 response = query_pinecone(user_input, conversation_history)
 
-                # Split the response by lines
-                for line in response.split('\n'):
-                    stripped_line = line.strip()
+                nesting_levels = []
+            previous_line_type = None
 
-                    # Check if it's a numbered list item (e.g., "1.", "2.", etc.)
-                    if re.match(r'^\d+\.', stripped_line):
-                        # Increase indentation for nested lists if needed
-                        if nesting_level > 0:
-                            nesting_level = 2
-                        else:
-                            nesting_level = 0
-                        # Add the formatted line to the full response
-                        full_response += "\n" + " " * nesting_level + stripped_line
-                    # Check if it's an unordered list item (e.g., "- Item")
-                    elif stripped_line.startswith('- '):
-                        # Increase indentation for nested lists if needed
-                        if nesting_level > 0:
-                            nesting_level = 2
-                        else:
-                            nesting_level = 0
-                        # Add the formatted line to the full response
-                        full_response += "\n" + " " * nesting_level + stripped_line
+            # Split the response by lines
+            lines = response.split('\n')
+
+            for i, line in enumerate(lines):
+                stripped_line = line.strip()
+
+                # Skip empty lines
+                if not stripped_line:
+                    full_response += "\n"
+                    previous_line_type = None
+                    continue
+
+                # Detect list items
+                numbered_match = re.match(r'^(\d+)\.\s*(.*)', stripped_line)
+                unordered_match = re.match(r'^(-|\+|\*)\s+(.*)', stripped_line)
+
+                if numbered_match:
+                    # Numbered list item
+                    current_level = len(nesting_levels)
+
+                    # Check if we need to adjust nesting
+                    if previous_line_type not in ['numbered', 'subitem']:
+                        nesting_levels = ['numbered']
                     else:
-                        # Reset nesting level for regular lines
-                        nesting_level = 0
-                        # Add the line to the full response
-                        full_response += "\n" + stripped_line
+                        nesting_levels.append('numbered')
 
-                    # Show progress (chunked response with markdown)
-                    time.sleep(0.05)
-                    message_placeholder.markdown(full_response + "▌")
+                    indentation = '  ' * (len(nesting_levels) - 1)
+                    full_response += f"\n{indentation}{stripped_line}"
+                    previous_line_type = 'numbered'
+
+                elif unordered_match:
+                    # Unordered list item
+                    current_level = len(nesting_levels)
+
+                    # Check if we need to adjust nesting
+                    if previous_line_type not in ['unordered', 'subitem']:
+                        nesting_levels = ['unordered']
+                    else:
+                        nesting_levels.append('unordered')
+
+                    indentation = '  ' * (len(nesting_levels) - 1)
+                    full_response += f"\n{indentation}{stripped_line}"
+                    previous_line_type = 'unordered'
+
+                else:
+                    # Regular line
+                    # Check if previous line ends with a colon, indicating potential subitems
+                    if previous_line_type in ['numbered', 'unordered'] and previous_line.strip().endswith(':'):
+                        nesting_levels.append('subitem')
+                        indentation = '  ' * len(nesting_levels)
+                        full_response += f"\n{indentation}{stripped_line}"
+                        previous_line_type = 'subitem'
+                    else:
+                        # Reset nesting levels
+                        nesting_levels = []
+                        full_response += f"\n{stripped_line}"
+                        previous_line_type = 'text'
+
+                previous_line = line
+
+                # Show progress (chunked response with markdown)
+                time.sleep(0.05)
+                message_placeholder.markdown(full_response + "▌")
                 
                 # Format the response as an email
                 email_ready_response = format_as_email(full_response)
