@@ -249,74 +249,12 @@ elif page == "Chatbot":
             with st.spinner('🤖 Assistant is processing your request...'):
                 response = query_pinecone(user_input, conversation_history)
 
-                nesting_levels = []
-                previous_line_type = None
-
-                # Split the response by lines
-                lines = response.split('\n')
-
-                for line in lines:
-                    stripped_line = line.strip()
-
-                    # Skip empty lines
-                    if not stripped_line:
-                        full_response += "\n"
-                        previous_line_type = None
-                        nesting_levels = []
-                        continue
-
-                    # Function to process line for list items
-                    def process_line(line, nesting_levels, previous_line_type):
-                        # Patterns to match list items anywhere in the line
-                        list_item_pattern = re.compile(r'(\s*)(-|\+|\*|\d+\.)\s+')
-
-                        # Split the line by list item markers
-                        parts = list_item_pattern.split(line)
-                        processed_line = ''
-                        i = 0
-                        while i < len(parts):
-                            text = parts[i]
-                            if i + 1 < len(parts) and parts[i+1]:
-                                marker = parts[i+1]
-                                content = parts[i+2] if i+2 < len(parts) else ''
-                                # Determine the type of list item
-                                if re.match(r'\d+\.', marker.strip()):
-                                    current_line_type = 'numbered'
-                                else:
-                                    current_line_type = 'unordered'
-
-                                # Adjust nesting levels
-                                if current_line_type == previous_line_type:
-                                    pass
-                                else:
-                                    if current_line_type in nesting_levels:
-                                        index = nesting_levels.index(current_line_type)
-                                        nesting_levels = nesting_levels[:index+1]
-                                    else:
-                                        nesting_levels.append(current_line_type)
-
-                                indentation = '  ' * len(nesting_levels)
-                                processed_line += f"\n{indentation}{marker.strip()} {content.strip()}"
-                                previous_line_type = current_line_type
-                                i += 3  # Move past the marker and content
-                            else:
-                                # Regular text
-                                if text.strip():
-                                    nesting_levels = []
-                                    previous_line_type = 'text'
-                                    processed_line += '\n' + text.strip()
-                                i += 1
-
-                        return processed_line.strip('\n'), nesting_levels, previous_line_type
-
-                    # Process the line
-                    processed_line, nesting_levels, previous_line_type = process_line(line, nesting_levels, previous_line_type)
-                    full_response += processed_line + '\n'
-
-                    # Show progress (chunked response with markdown)
-                    time.sleep(0.05)
+                full_response = ""
+                for char in response:
+                    full_response += char
+                    time.sleep(0.01)
                     message_placeholder.markdown(full_response + "▌")
-                
+    
                 # Format the response as an email
                 email_ready_response = format_as_email(full_response)
                 message_placeholder.markdown(email_ready_response)
