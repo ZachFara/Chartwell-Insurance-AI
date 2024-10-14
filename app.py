@@ -135,7 +135,7 @@ def copy_to_clipboard(text):
     st.markdown("""
         <style>
         .bk, .bk-btn, .bk-btn-default {
-            background-color: #2A5CAA !important;
+            background-color: rgb(19, 101, 168) !important;
             border: none !important;
             color: white !important;
             padding: 0 !important; /* Remove extra padding */
