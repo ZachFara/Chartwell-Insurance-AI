@@ -248,20 +248,35 @@ elif page == "Chatbot":
             with st.spinner('🤖 Assistant is processing your request...'):
                 response = query_pinecone(user_input, conversation_history)
 
-                for chunk in response.split():
-                    
-                    # Fix some of the formatting
-                    if chunk[0].isdigit() and chunk[1] == '.':
-                        full_response += "\n" + chunk + " "
-                    elif chunk.startswith("- "):
-                        full_response += "\n  " + chunk + " "
-                    elif full_response.endswith("\n  ") and chunk[0].isdigit() and chunk[1] == '.':
-                        full_response += "  " + chunk + " "
-                    elif full_response.endswith("\n") and chunk.startswith("- "):
-                        full_response += "  " + chunk + " "
+                # Split the response by lines
+                for line in response.split('\n'):
+                    stripped_line = line.strip()
+
+                    # Check if it's a numbered list item (e.g., "1.", "2.", etc.)
+                    if re.match(r'^\d+\.', stripped_line):
+                        # Increase indentation for nested lists if needed
+                        if nesting_level > 0:
+                            nesting_level = 2
+                        else:
+                            nesting_level = 0
+                        # Add the formatted line to the full response
+                        full_response += "\n" + " " * nesting_level + stripped_line
+                    # Check if it's an unordered list item (e.g., "- Item")
+                    elif stripped_line.startswith('- '):
+                        # Increase indentation for nested lists if needed
+                        if nesting_level > 0:
+                            nesting_level = 2
+                        else:
+                            nesting_level = 0
+                        # Add the formatted line to the full response
+                        full_response += "\n" + " " * nesting_level + stripped_line
                     else:
-                        full_response += chunk + " "
-                        
+                        # Reset nesting level for regular lines
+                        nesting_level = 0
+                        # Add the line to the full response
+                        full_response += "\n" + stripped_line
+
+                    # Show progress (chunked response with markdown)
                     time.sleep(0.05)
                     message_placeholder.markdown(full_response + "▌")
                 
