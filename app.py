@@ -253,6 +253,8 @@ elif page == "Chatbot":
                     # Fix some of the formatting
                     if chunk[0].isdigit() and chunk[1] == '.':
                         full_response += "\n" + chunk + " "
+                    elif "-" in chunk:
+                        full_response += "\n" + chunk + " "
                     else:
                         full_response += chunk + " "
                         
