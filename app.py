@@ -249,7 +249,13 @@ elif page == "Chatbot":
                 response = query_pinecone(user_input, conversation_history)
 
                 for chunk in response.split():
-                    full_response += chunk + " "
+                    
+                    # Fix some of the formatting
+                    if chunk[0].isdigit() and chunk[1] == '.':
+                        full_response += "\n" + chunk + " "
+                    else:
+                        full_response += chunk + " "
+                        
                     time.sleep(0.05)
                     message_placeholder.markdown(full_response + "▌")
                 
