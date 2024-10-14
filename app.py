@@ -4,7 +4,6 @@ from pinecone import Pinecone
 from PyPDF2 import PdfReader
 from docx2pdf import convert as docx_to_pdf
 import os
-import io
 import re
 from dotenv import load_dotenv
 import nest_asyncio
@@ -17,7 +16,7 @@ import time
 nest_asyncio.apply()
 from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from utils.text_cleaning import remove_substrings, collapse_spaces
+from utils.text_cleaning import read_text_file, clean_text
 from utils.getting_embeddings import get_embeddings
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
 
@@ -48,22 +47,9 @@ llama_parser = LlamaParse(result_type="markdown")
 
 #------------------Document Processing
 
-def read_text_file(file_path, encoding='utf-8'):
-    try:
-        with open(file_path, 'r', encoding=encoding) as file:
-            return file.read()
-    except UnicodeDecodeError:
-        with open(file_path, 'r', encoding='latin-1') as file:
-            return file.read()
-        
 def read_pdf_file(file_path):
     documents = llama_parser.load_data(file_path)
     return [doc.text for doc in documents]
-
-def clean_text(text):
-    text = remove_substrings(text, {"/C20", "\n"}, " ")
-    text = collapse_spaces(text)
-    return text
 
 def process_document(file_path):
     try:
@@ -130,6 +116,7 @@ def query_pinecone(query, conversation_history):
     return response
 
 def copy_to_clipboard(text):
+    # This is the HTML element that we are targeting with this CSS and this function in general
     # <button class="bk bk-btn bk-btn-default" type="button">Copy</button>
     
     st.markdown("""
