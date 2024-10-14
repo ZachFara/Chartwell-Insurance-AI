@@ -25,7 +25,7 @@ def filter_contexts2(contexts, keyword, similarity_threshold = .7):
     return filtered_contexts
 
 def augment_query(query, filtered_contexts):
-    augmented_query = "\n\n---\n\n".join(filtered_contexts) + "\n\n-----\n\n" + query
+    augmented_query = "\n\n---\n\n".join([f"Context {i+1}:\n{context}" for i, context in enumerate(filtered_contexts)]) + "\n\n-----\n\n" + query
     return augmented_query
 
 def generate_response(primer, augmented_query, client):
