@@ -151,6 +151,14 @@ def copy_to_clipboard(text):
         </style>
         """, unsafe_allow_html=True)
     
+    # Here we have to remove some of the formatting from the text because it will copy that to the users clipboard
+    
+    # 1. Remove the subject line
+    subject_pattern = re.compile(r"^Subject:.*$", re.MULTILINE)
+    text = re.sub(subject_pattern, "", text)
+    # 2. Remove bolding for MD format
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    
     copy_button = Button(label="Copy")
     copy_button.js_on_event("button_click", CustomJS(args=dict(text=text), code="""
         navigator.clipboard.writeText(text);
