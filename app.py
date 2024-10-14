@@ -106,7 +106,7 @@ def upload_documents_to_pinecone(file_paths):
 #------------------Querying Pinecone
 def query_pinecone(query, conversation_history):
     query_embedding = get_embeddings(query, openai)[0]
-    contexts = retrieve_contexts(index, query_embedding, 20)
+    contexts = retrieve_contexts(index, query_embedding, 30)
     
     # Combine the current query with conversation history
     full_context = "\n".join(conversation_history) + "\n" + query
@@ -250,7 +250,7 @@ elif page == "Chatbot":
                 full_response = ""
                 for char in response:
                     full_response += char
-                    time.sleep(0.01)
+                    time.sleep(0.002)
                     message_placeholder.markdown(full_response + "▌")
     
                 # Format the response as an email
