@@ -5,6 +5,7 @@ from PyPDF2 import PdfReader
 from docx2pdf import convert as docx_to_pdf
 import os
 import io
+import re
 from dotenv import load_dotenv
 import nest_asyncio
 import time
