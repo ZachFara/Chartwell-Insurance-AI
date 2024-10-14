@@ -158,6 +158,9 @@ def copy_to_clipboard(text):
     text = re.sub(subject_pattern, "", text)
     # 2. Remove bolding for MD format
     text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    # 3. Remove any spaces or newlines that come before the response
+    text = text.lstrip()
+    
     
     copy_button = Button(label="Copy")
     copy_button.js_on_event("button_click", CustomJS(args=dict(text=text), code="""
