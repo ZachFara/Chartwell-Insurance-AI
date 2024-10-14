@@ -250,11 +250,15 @@ elif page == "Chatbot":
 
                 for chunk in response.split():
                     
-                    # Fix some of the formatting
+                    # Determine if we are within a certain type of list
                     if chunk[0].isdigit() and chunk[1] == '.':
-                        full_response += "\n" + chunk + " "
+                        if not full_response.endswith("\n"):
+                            full_response += "\n"
+                        full_response += chunk + " "
                     elif "-" in chunk:
-                        full_response += "\n" + chunk + " "
+                        if not full_response.endswith("\n"):
+                            full_response += "\n"
+                        full_response += chunk + " "
                     else:
                         full_response += chunk + " "
                         
