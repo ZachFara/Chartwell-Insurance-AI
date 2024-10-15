@@ -216,7 +216,7 @@ elif page == "Chatbot":
             f"Subject: {subject}\n\n"
             f"Dear {recipient},\n\n"
             f"{content}\n\n"
-            "Best regards,\n"
+            "Best regards,  \n"  # Add two spaces before the newline
             f"{sender}"
         )
         return email_content
