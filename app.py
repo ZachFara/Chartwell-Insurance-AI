@@ -9,8 +9,9 @@ from dotenv import load_dotenv
 import nest_asyncio
 import time
 import streamlit as st
-from bokeh.models.widgets import Button
-from bokeh.models import CustomJS
+# from bokeh.models.widgets import Button
+from streamlit.components.v1 import html
+# from bokeh.models import CustomJS
 from streamlit_bokeh_events import streamlit_bokeh_events
 import time
 nest_asyncio.apply()
@@ -116,30 +117,7 @@ def query_pinecone(query, conversation_history):
     return response
 
 def copy_to_clipboard(text):
-    # This is the HTML element that we are targeting with this CSS and this function in general
-    # <button class="bk bk-btn bk-btn-default" type="button">Copy</button>
-    
-    st.markdown("""
-        <style>
-        .bk, .bk-btn, .bk-btn-default {
-            background-color: rgb(19, 101, 168) !important;
-            border: none !important;
-            color: white !important;
-            padding: 0 !important; /* Remove extra padding */
-            font-size: 14px !important;
-            cursor: pointer !important;
-            border-radius: 5px !important;
-            width: 50px !important;  /* Set fixed width */
-            height: 35px !important;  /* Set fixed height */
-            display: inline-flex !important;  /* Ensure proper inline display */
-            justify-content: center;  /* Center text horizontally */
-            align-items: center;  /* Center text vertically */
-        }
-        </style>
-        """, unsafe_allow_html=True)
-    
-    # Here we have to remove some of the formatting from the text because it will copy that to the users clipboard
-    
+    # Clean up the text
     # 1. Remove the subject line
     subject_pattern = re.compile(r"^Subject:.*$", re.MULTILINE)
     text = re.sub(subject_pattern, "", text)
@@ -148,13 +126,32 @@ def copy_to_clipboard(text):
     # 3. Remove any spaces or newlines that come before the response
     text = text.lstrip()
     
+    # Create a simple button with JavaScript functionality
+    copy_button_html = f"""
+        <style>
+        .copy-button {{
+            background-color: rgb(19, 101, 168);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 50px;
+            height: 35px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }}
+        </style>
+        <button 
+            class="copy-button"
+            onclick="navigator.clipboard.writeText(`{text.replace('`', '\\`')}`)">
+            Copy
+        </button>
+    """
     
-    copy_button = Button(label="Copy")
-    copy_button.js_on_event("button_click", CustomJS(args=dict(text=text), code="""
-        navigator.clipboard.writeText(text);
-    """))
-    
-    st.bokeh_chart(copy_button)
+    html(copy_button_html, height=50)
 
 def clear_conversation():
     st.session_state.messages = []
