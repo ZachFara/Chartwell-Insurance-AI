@@ -1,6 +1,5 @@
 import openai
 import spacy
-# comment
 
 def retrieve_contexts(index, vector, top_k=10):
     res = index.query(vector=vector, top_k=top_k, include_metadata=True)
