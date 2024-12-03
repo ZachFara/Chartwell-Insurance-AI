@@ -12,7 +12,7 @@ import streamlit as st
 # from bokeh.models.widgets import Button
 from streamlit.components.v1 import html
 # from bokeh.models import CustomJS
-from streamlit_bokeh_events import streamlit_bokeh_events
+# from streamlit_bokeh_events import streamlit_bokeh_events
 import time
 nest_asyncio.apply()
 from llama_parse import LlamaParse
