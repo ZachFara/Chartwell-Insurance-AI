@@ -157,7 +157,7 @@ def clear_conversation():
     st.session_state.messages = []
 
 #------------------Streamlit Interface
-st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png", use_column_width=True)
+st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png", use_container_width=True)
 st.sidebar.title("Chartwell Insurance AI Assistant")
 
 st.sidebar.header("Navigation")
