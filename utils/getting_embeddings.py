@@ -16,7 +16,7 @@ def chunk_text(text, max_tokens=4000):
     
     return text_chunks
 
-def get_embeddings(text, client):
+def get_embeddings(text, client, model = "text-embedding-3-small"):
     chunks = chunk_text(text)
     embeddings = []
     
