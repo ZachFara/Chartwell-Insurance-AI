@@ -5,6 +5,10 @@ def retrieve_contexts(index, vector, top_k=10):
     res = index.query(vector=vector, top_k=top_k, include_metadata=True)
     return [item['metadata']['text'] for item in res['matches']]
 
+def retrieve_contexts_with_metadata(index, vector, top_k=10):
+    res = index.query(vector=vector, top_k=top_k, include_metadata=True)
+    return res['matches']
+
 def filter_contexts(contexts, keyword):
     return [context for context in contexts if keyword in context]
 

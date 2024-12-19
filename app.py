@@ -19,7 +19,7 @@ from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import read_text_file, clean_text
 from utils.getting_embeddings import get_embeddings
-from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
+from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts, retrieve_contexts_with_metadata
 
 # Load environment variables 
 load_dotenv()
@@ -64,7 +64,9 @@ def process_document(file_path):
         else:
             return f"Unsupported file format: {file_path}", None
         document_id = os.path.basename(file_path)
-        def chunk_text(text, size=20_000, overlap=200):
+        
+        # Adjust chunk size and overlap
+        def chunk_text(text, size=1000, overlap=300):
             chunks = []
             start = 0
             while start < len(text):
@@ -72,12 +74,13 @@ def process_document(file_path):
                 chunks.append(text[start:end])
                 start = end - overlap
             return chunks
+        
         for i, doc_text in enumerate(document_texts):
             doc_text = clean_text(doc_text)
-            for c, chunk in enumerate(chunk_text(doc_text)):
-                embeddings = get_embeddings(chunk, openai, model = "text-embedding-3-large")
+            for c, chunk in enumerate(chunk_text(doc_text, size=1000, overlap=300)):
+                embeddings = get_embeddings(chunk, openai, model="text-embedding-3-large")
                 for j, embedding in enumerate(embeddings):
-                    index.upsert(vectors=[{"id":f"{document_id}_{i}_{c}_{j}","values":embedding,"metadata":{"text":chunk[:20000]}}])
+                    index.upsert(vectors=[{"id":f"{document_id}_{i}_{c}_{j}","values":embedding,"metadata":{"text":chunk}}])
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
@@ -92,10 +95,18 @@ def upload_documents_to_pinecone(file_paths):
     return results
 
 #------------------Querying Pinecone
-def query_pinecone(query, conversation_history):
+def query_pinecone(query, conversation_history, similarity_threshold=0):
     query_embedding = get_embeddings(query, openai)[0]
-    contexts = retrieve_contexts(index, query_embedding, 30)
-    
+    contexts_with_metadata = retrieve_contexts_with_metadata(index, query_embedding, 100)
+
+    contexts = [
+        match['metadata']['text'] for match in contexts_with_metadata
+        if match['score'] >= similarity_threshold
+    ]
+
+    avg_score = sum(match['score'] for match in contexts_with_metadata) / len(contexts_with_metadata)
+    print(f"Average score: {avg_score} of retrieved contexts. Kept {len(contexts)}/{len(contexts_with_metadata)} .")
+
     # Combine the current query with conversation history
     full_context = "\n".join(conversation_history) + "\n" + query
     augmented_query = augment_query(full_context, contexts)
