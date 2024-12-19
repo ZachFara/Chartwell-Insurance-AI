@@ -28,9 +28,9 @@ def augment_query(query, filtered_contexts):
     augmented_query = "\n\n---\n\n".join([f"Context {i+1}:\n{context}" for i, context in enumerate(filtered_contexts)]) + "\n\n-----\n\n" + query
     return augmented_query
 
-def generate_response(primer, augmented_query, client):
+def generate_response(primer, augmented_query, client, model = "gpt-4o-mini"):
     res = openai.ChatCompletion.create(
-        model="gpt-4o-mini",
+        model=model,
         messages=[
             {"role": "system", "content": primer},
             {"role": "user", "content": augmented_query}

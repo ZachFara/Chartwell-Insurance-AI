@@ -26,14 +26,13 @@ load_dotenv()
 
 primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
 designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
-Your responses should be based strictly on the information provided by the user in their query and the given context. 
+Your response should be based on the information available in the documents uploaded and some reasonable conclusions that you can make from them.
 Use the following pieces of context to answer the question at the end in detail with clear explanations. 
-If you don't know the answer, explicitly state that you don't know, and do not attempt to fabricate an answer. 
 Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance. 
 Be concise yet thorough in your explanations.
 Lastly, make sure to always follow the tone and structure of a customer service email.
-If there is a name presented to you within your prompt make sure to address the email to that person.
 Do not include email headers, greetings, or signatures in your response.
+Also don't mention the provided context, just treat that as your knowledge base.
 """
 
 # Initialize Pinecone client
@@ -54,7 +53,7 @@ def read_pdf_file(file_path):
 
 def process_document(file_path):
     try:
-        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf' # Make a destination path, this will hold the path of the pdf file if we have to perform a conversion
+        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf'
         if file_path.endswith('.txt'):
             document_texts = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
@@ -64,33 +63,21 @@ def process_document(file_path):
             document_texts = read_pdf_file(pdf_path)
         else:
             return f"Unsupported file format: {file_path}", None
-        
         document_id = os.path.basename(file_path)
-        
-        for i, document_text in enumerate(document_texts):
-            document_text = clean_text(document_text)
-            embeddings = get_embeddings(document_text, openai)
-            
-            # Upsert each embedding into Pinecone
-            for j, embedding in enumerate(embeddings):
-                print(embedding)
-                
-                DOCUMENT_LENGTH_LIMIT = 20_000
-                
-                if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the text exceeds the limit
-                    print("Metadata length limit exceeded, cutting the length short and upserting to pinecone with some text removed!")
-                    document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
-                
-                index.upsert(
-                vectors=[
-                    {
-                        "id": f"{document_id}_chunk_{i}_{j}",
-                        "values": embedding,
-                        "metadata": {"text": document_text}
-                    }
-                ]
-            )
-        
+        def chunk_text(text, size=20_000, overlap=200):
+            chunks = []
+            start = 0
+            while start < len(text):
+                end = start + size
+                chunks.append(text[start:end])
+                start = end - overlap
+            return chunks
+        for i, doc_text in enumerate(document_texts):
+            doc_text = clean_text(doc_text)
+            for c, chunk in enumerate(chunk_text(doc_text)):
+                embeddings = get_embeddings(chunk, openai, model = "text-embedding-3-large")
+                for j, embedding in enumerate(embeddings):
+                    index.upsert(vectors=[{"id":f"{document_id}_{i}_{c}_{j}","values":embedding,"metadata":{"text":chunk[:20000]}}])
         return None, f"Document '{document_id}' successfully added to Pinecone index."
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
@@ -112,8 +99,9 @@ def query_pinecone(query, conversation_history):
     # Combine the current query with conversation history
     full_context = "\n".join(conversation_history) + "\n" + query
     augmented_query = augment_query(full_context, contexts)
+    print(f"All contexts seen: {augmented_query}")
     
-    response = generate_response(primer, augmented_query, openai)
+    response = generate_response(primer, augmented_query, openai, model="gpt-4o")
     return response
 
 def copy_to_clipboard(text):
