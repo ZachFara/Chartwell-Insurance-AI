@@ -86,111 +86,56 @@ def process_document(file_path, delimiters=None):
         # Regroup document texts with a newline separator
         document_texts = "\n".join(document_texts)
 
+        # Clean the text
+        document_texts = clean_text(document_texts)
         
+        # Extract the ID
         document_id = os.path.basename(file_path)
         
+        def chunk_text(text):
 
-        def chunk_text(text, delimiters=None, max_words=100, min_words=10):
-            """
-            Splits the text into chunks, each starting with a header defined by delimiters and limited by max_words.
-            If a chunk is smaller than min_words, it is appended to the next chunk.
+            # Apply our nice chunking handler to do all of the chunking for us
+            handler = ChunkingHandler(text)
+            handler.remove_empty(handler.text.split('\n')) \
+                   .list_to_text(seperator='\n') \
+                   .split_by_headers() \
+                   .remove_header_notation('#') \
+                   .remove_header_notation('WHITESPACE') \
+                   .split_on_enumeration() \
+                   .merge_short_sentences(char_limit=40) \
+                   .move_ending_all_caps_line() \
+                   .remove_empty(handler.chunks) \
+                   .remove_duplicates() \
+                   .overlap_wordcount_chunking(max_words=250, overlap=50)
 
-            Args:
-                text (str): The text to split.
-                delimiters (list, optional): A list of delimiter strings that indicate where to start a new chunk.
-                                            Defaults to ['#'].
-                max_words (int, optional): Maximum number of words per chunk. Defaults to 500.
-                min_words (int, optional): Minimum number of words a chunk should have. Defaults to 100.
+            # Assert that the handler chunks is not None
+            assert handler.chunks is not None
+            
+            for chunk in handler.chunks:
+                yield chunk
 
-            Yields:
-                str: A chunk of text starting with a delimiter and within the word limits.
-            """
-            if delimiters is None:
-                delimiters = ['#']  # Default delimiter
+        chunk_generator = chunk_text(document_texts)
 
-            # Create a regex pattern to match headers starting with delimiters
-            # e.g., '# ', '## ', '### ', etc.
-            delimiter_pattern = '|'.join([fr'^{re.escape(d)}\s+' for d in delimiters])
+        # Generate embeddings and upsert into Pinecone
+        for i, chunk in enumerate(chunk_generator):
+            embeddings = get_embeddings(chunk, client = None)
+            if isinstance(embeddings[0], float):
+                embedding = embeddings
+            else:
+                assert len(embeddings) == 1, "Expected only one embedding"
+                embedding = embeddings[0]
+            vector_id = f"{document_id}_{i}_0"
+            index.upsert([{
+                "id": vector_id,
+                "values": embedding,
+                "metadata": {"text": chunk}
+            }])
 
-            # Use lookahead to split while keeping the delimiter with the following text
-            split_regex = f'(?m)(?=({delimiter_pattern}))'
-            split_text = re.split(split_regex, text)
-
-            current_chunk = ""
-            buffer = ""  # Buffer to hold small chunks
-
-            for part in split_text:
-                if re.match(delimiter_pattern, part):
-                    if current_chunk:
-                        # Split the current_chunk into sub-chunks based on max_words
-                        for sub_chunk in split_by_word_limit(current_chunk, max_words):
-                            if buffer:
-                                # Append buffer to the current sub_chunk
-                                sub_chunk = buffer + ' ' + sub_chunk
-                                buffer = ""
-                            
-                            word_count = len(sub_chunk.split())
-                            
-                            if word_count >= min_words:
-                                yield sub_chunk.strip()
-                            else:
-                                # Buffer the small chunk to append to the next one
-                                buffer = sub_chunk
-                    current_chunk = part  # Start new chunk with delimiter
-                else:
-                    current_chunk += " " + part  # Append text to the current chunk
-
-            # Handle the last chunk
-            if current_chunk:
-                for sub_chunk in split_by_word_limit(current_chunk, max_words):
-                    if buffer:
-                        sub_chunk = buffer + ' ' + sub_chunk
-                        buffer = ""
-                    
-                    word_count = len(sub_chunk.split())
-                    
-                    if word_count >= min_words:
-                        yield sub_chunk.strip()
-                    else:
-                        buffer = sub_chunk
-
-            # Yield any remaining buffer
-            if buffer:
-                yield buffer.strip()
-
-        def split_by_word_limit(text, max_words):
-            """
-            Splits the text into sub-chunks each with at most max_words.
-
-            Args:
-                text (str): The text to split.
-                max_words (int): Maximum number of words per sub-chunk.
-
-            Yields:
-                str: A sub-chunk of text within the word limit.
-            """
-            words = text.split()
-            for i in range(0, len(words), max_words):
-                yield ' '.join(words[i:i + max_words])
-
-        
-        for i, doc_text in enumerate(document_texts):
-            doc_text = clean_text(doc_text)
-            chunk_generator = chunk_text(doc_text, max_words=250, min_words=10, delimiters=delimiters)
-            for c, chunk in enumerate(chunk_generator):
-                embeddings = get_embeddings(chunk, openai, model="text-embedding-3-large")
-                for j, embedding in enumerate(embeddings):
-                    vector_id = f"{document_id}_{i}_{c}_{j}"
-                    index.upsert(vectors=[{
-                        "id": vector_id,
-                        "values": embedding,
-                        "metadata": {"text": chunk}
-                    }])
-        
         return None, f"Document '{document_id}' successfully added to Pinecone index."
-    
+
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
+        
 
 def upload_documents_to_pinecone(file_paths):
     results = []

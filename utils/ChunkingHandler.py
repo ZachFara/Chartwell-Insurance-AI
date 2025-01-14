@@ -1,3 +1,6 @@
+import re
+from typing import List, Union
+
 class ChunkingHandler:
     def __init__(self, text) -> None:
         self.text = text
@@ -132,6 +135,22 @@ class ChunkingHandler:
                 unique_chunks.append(chunk)
                 seen.add(chunk)
         self.chunks = unique_chunks
+        return self
+
+    def overlap_wordcount_chunking(self, max_words=100, overlap=0):
+        combined_text = ' '.join(self.chunks) if self.chunks else self.text
+        words = combined_text.split()
+        final_chunks = []
+        i = 0
+        while i < len(words):
+            chunk_words = words[i:i + max_words]
+            chunk_text = ' '.join(chunk_words)
+            final_chunks.append(chunk_text)
+            if overlap > 0:
+                i += max_words - overlap
+            else:
+                i += max_words
+        self.chunks = [c.strip() for c in final_chunks if c.strip()]
         return self
 
 if __name__ == '__main__':
