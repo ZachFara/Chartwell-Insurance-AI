@@ -1,7 +1,6 @@
 import streamlit as st
 import openai
 from pinecone import Pinecone
-from PyPDF2 import PdfReader
 from docx2pdf import convert as docx_to_pdf
 import os
 import re
@@ -20,6 +19,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import read_text_file, clean_text
 from utils.getting_embeddings import get_embeddings
 from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts, retrieve_contexts_with_metadata
+from utils.ChunkingHandler import ChunkingHandler
 
 # Load environment variables 
 load_dotenv()
@@ -51,9 +51,28 @@ def read_pdf_file(file_path):
     documents = llama_parser.load_data(file_path)
     return [doc.text for doc in documents]
 
-def process_document(file_path):
+
+
+def process_document(file_path, delimiters=None):
+    """
+    Processes a document by reading its content, splitting it into chunks based on size, overlap, and delimiters,
+    generating embeddings for each chunk, and upserting them into a Pinecone index.
+
+    Args:
+        file_path (str): The path to the document file.
+        delimiters (list, optional): A list of delimiter strings that indicate where to start a new chunk.
+                                     Defaults to ['#'] if not provided.
+
+    Returns:
+        tuple: A tuple containing an error message (if any) and a success message.
+    """
     try:
-        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf'
+        if delimiters is None:
+            delimiters = ['#']  # Default delimiter
+
+        pdf_path = os.path.splitext(file_path)[0] + '.pdf'
+        
+        # Read the document based on its file extension
         if file_path.endswith('.txt'):
             document_texts = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
@@ -63,25 +82,113 @@ def process_document(file_path):
             document_texts = read_pdf_file(pdf_path)
         else:
             return f"Unsupported file format: {file_path}", None
+
+        # Regroup document texts with a newline separator
+        document_texts = "\n".join(document_texts)
+
+        
         document_id = os.path.basename(file_path)
         
-        # Adjust chunk size and overlap
-        def chunk_text(text, size=1000, overlap=300):
-            chunks = []
-            start = 0
-            while start < len(text):
-                end = start + size
-                chunks.append(text[start:end])
-                start = end - overlap
-            return chunks
+
+        def chunk_text(text, delimiters=None, max_words=100, min_words=10):
+            """
+            Splits the text into chunks, each starting with a header defined by delimiters and limited by max_words.
+            If a chunk is smaller than min_words, it is appended to the next chunk.
+
+            Args:
+                text (str): The text to split.
+                delimiters (list, optional): A list of delimiter strings that indicate where to start a new chunk.
+                                            Defaults to ['#'].
+                max_words (int, optional): Maximum number of words per chunk. Defaults to 500.
+                min_words (int, optional): Minimum number of words a chunk should have. Defaults to 100.
+
+            Yields:
+                str: A chunk of text starting with a delimiter and within the word limits.
+            """
+            if delimiters is None:
+                delimiters = ['#']  # Default delimiter
+
+            # Create a regex pattern to match headers starting with delimiters
+            # e.g., '# ', '## ', '### ', etc.
+            delimiter_pattern = '|'.join([fr'^{re.escape(d)}\s+' for d in delimiters])
+
+            # Use lookahead to split while keeping the delimiter with the following text
+            split_regex = f'(?m)(?=({delimiter_pattern}))'
+            split_text = re.split(split_regex, text)
+
+            current_chunk = ""
+            buffer = ""  # Buffer to hold small chunks
+
+            for part in split_text:
+                if re.match(delimiter_pattern, part):
+                    if current_chunk:
+                        # Split the current_chunk into sub-chunks based on max_words
+                        for sub_chunk in split_by_word_limit(current_chunk, max_words):
+                            if buffer:
+                                # Append buffer to the current sub_chunk
+                                sub_chunk = buffer + ' ' + sub_chunk
+                                buffer = ""
+                            
+                            word_count = len(sub_chunk.split())
+                            
+                            if word_count >= min_words:
+                                yield sub_chunk.strip()
+                            else:
+                                # Buffer the small chunk to append to the next one
+                                buffer = sub_chunk
+                    current_chunk = part  # Start new chunk with delimiter
+                else:
+                    current_chunk += " " + part  # Append text to the current chunk
+
+            # Handle the last chunk
+            if current_chunk:
+                for sub_chunk in split_by_word_limit(current_chunk, max_words):
+                    if buffer:
+                        sub_chunk = buffer + ' ' + sub_chunk
+                        buffer = ""
+                    
+                    word_count = len(sub_chunk.split())
+                    
+                    if word_count >= min_words:
+                        yield sub_chunk.strip()
+                    else:
+                        buffer = sub_chunk
+
+            # Yield any remaining buffer
+            if buffer:
+                yield buffer.strip()
+
+        def split_by_word_limit(text, max_words):
+            """
+            Splits the text into sub-chunks each with at most max_words.
+
+            Args:
+                text (str): The text to split.
+                max_words (int): Maximum number of words per sub-chunk.
+
+            Yields:
+                str: A sub-chunk of text within the word limit.
+            """
+            words = text.split()
+            for i in range(0, len(words), max_words):
+                yield ' '.join(words[i:i + max_words])
+
         
         for i, doc_text in enumerate(document_texts):
             doc_text = clean_text(doc_text)
-            for c, chunk in enumerate(chunk_text(doc_text, size=1000, overlap=300)):
+            chunk_generator = chunk_text(doc_text, max_words=250, min_words=10, delimiters=delimiters)
+            for c, chunk in enumerate(chunk_generator):
                 embeddings = get_embeddings(chunk, openai, model="text-embedding-3-large")
                 for j, embedding in enumerate(embeddings):
-                    index.upsert(vectors=[{"id":f"{document_id}_{i}_{c}_{j}","values":embedding,"metadata":{"text":chunk}}])
+                    vector_id = f"{document_id}_{i}_{c}_{j}"
+                    index.upsert(vectors=[{
+                        "id": vector_id,
+                        "values": embedding,
+                        "metadata": {"text": chunk}
+                    }])
+        
         return None, f"Document '{document_id}' successfully added to Pinecone index."
+    
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
 
@@ -105,12 +212,20 @@ def query_pinecone(query, conversation_history, similarity_threshold=0):
     ]
 
     avg_score = sum(match['score'] for match in contexts_with_metadata) / len(contexts_with_metadata)
-    print(f"Average score: {avg_score} of retrieved contexts. Kept {len(contexts)}/{len(contexts_with_metadata)} .")
 
-    # Combine the current query with conversation history
+    # Logging
+    with open("last_response.txt", "w") as file:
+        file.write("")
+    with open("last_response.txt", "a") as file:
+        file.write(f"average score: {avg_score} of retrieved contexts. kept {len(contexts)}/{len(contexts_with_metadata)} .\n")
+
+    # combine the current query with conversation history
     full_context = "\n".join(conversation_history) + "\n" + query
     augmented_query = augment_query(full_context, contexts)
-    print(f"All contexts seen: {augmented_query}")
+
+    # Logging
+    with open("last_response.txt", "a") as file:
+        file.write(f"all contexts seen: {augmented_query}\n")
     
     response = generate_response(primer, augmented_query, openai, model="gpt-4o")
     return response
@@ -179,7 +294,7 @@ if page == "Document Upload":
             file_paths = []
             for uploaded_file in uploaded_files:
                 file_path = os.path.join("/tmp", uploaded_file.name)
-                with open(file_path, "wb") as f:
+                with  open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 file_paths.append(file_path)
                 st.success(f"Uploaded `{uploaded_file.name}`")
