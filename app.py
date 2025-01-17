@@ -88,6 +88,10 @@ def process_document(file_path, delimiters=None):
 
         # Clean the text
         document_texts = clean_text(document_texts)
+
+        # Upload the document text as a .txt file for debugging
+        with open("document_test2.txt", "a") as file:
+            file.write(document_texts)
         
         # Extract the ID
         document_id = os.path.basename(file_path)
@@ -118,6 +122,13 @@ def process_document(file_path, delimiters=None):
 
         # Generate embeddings and upsert into Pinecone
         for i, chunk in enumerate(chunk_generator):
+
+            with open("chunks.txt", "a") as file:
+                file.write(chunk)
+                file.write('-' * 300)
+
+
+            # embeddings = get_embeddings(chunk, client = None, model = "text-embedding-3-large")
             embeddings = get_embeddings(chunk, client = None)
             if isinstance(embeddings[0], float):
                 embedding = embeddings
@@ -129,7 +140,8 @@ def process_document(file_path, delimiters=None):
                 "id": vector_id,
                 "values": embedding,
                 "metadata": {"text": chunk}
-            }])
+            }],
+                namespace = 'testing-index')
 
         return None, f"Document '{document_id}' successfully added to Pinecone index."
 
