@@ -140,8 +140,7 @@ def process_document(file_path, delimiters=None):
                 "id": vector_id,
                 "values": embedding,
                 "metadata": {"text": chunk}
-            }],
-                namespace = 'testing-index')
+            }])
 
         return None, f"Document '{document_id}' successfully added to Pinecone index."
 
