@@ -6,7 +6,7 @@ def remove_substrings(s, substrings_to_remove, replacement_string):
     return s
 
 def collapse_spaces(s):
-    return re.sub(r'\s+', '\n', s).strip()
+    return re.sub(r'\s+', ' ', s).strip()
 
 def read_text_file(file_path, encoding='utf-8'):
     try:

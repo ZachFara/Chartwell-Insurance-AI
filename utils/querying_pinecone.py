@@ -5,10 +5,6 @@ def retrieve_contexts(index, vector, top_k=10):
     res = index.query(vector=vector, top_k=top_k, include_metadata=True)
     return [item['metadata']['text'] for item in res['matches']]
 
-def retrieve_contexts_with_metadata(index, vector, top_k=10):
-    res = index.query(vector=vector, top_k=top_k, include_metadata=True)
-    return res['matches']
-
 def filter_contexts(contexts, keyword):
     return [context for context in contexts if keyword in context]
 
@@ -32,19 +28,12 @@ def augment_query(query, filtered_contexts):
     augmented_query = "\n\n---\n\n".join([f"Context {i+1}:\n{context}" for i, context in enumerate(filtered_contexts)]) + "\n\n-----\n\n" + query
     return augmented_query
 
-def generate_response(primer, augmented_query, client, model="gpt-4o-mini"):
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            res = openai.ChatCompletion.create(
-                model=model,
-                messages=[
-                    {"role": "system", "content": primer},
-                    {"role": "user", "content": augmented_query}
-                ]
-            )
-            return res['choices'][0]['message']['content']
-        except openai.error.RateLimitError:
-            if attempt == max_retries - 1:  # Last attempt
-                raise  # Re-raise if all retries failed
-            time.sleep(20 * (attempt + 1))  # Wait longer between retries
+def generate_response(primer, augmented_query, client):
+    res = openai.ChatCompletion.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": primer},
+            {"role": "user", "content": augmented_query}
+        ]
+    )
+    return res['choices'][0]['message']['content']
