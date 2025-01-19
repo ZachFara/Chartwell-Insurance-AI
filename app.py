@@ -226,7 +226,7 @@ def copy_to_clipboard(text):
             </style>
             <button 
                 class="copy-button"
-                onclick="navigator.clipboard.writeText('{text.replace("`", "\`")}')">
+                onclick='navigator.clipboard.writeText("{text}")'>
                 Copy
             </button>
         """
