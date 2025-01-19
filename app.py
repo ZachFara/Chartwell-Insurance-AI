@@ -159,32 +159,42 @@ def upload_documents_to_pinecone(file_paths):
 
 #------------------Querying Pinecone
 def query_pinecone(query, conversation_history, similarity_threshold=0):
-    query_embedding = get_embeddings(query, openai)[0]
-    contexts_with_metadata = retrieve_contexts_with_metadata(index, query_embedding, 100)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            query_embedding = get_embeddings(query, openai)[0]
+            contexts_with_metadata = retrieve_contexts_with_metadata(index, query_embedding, 100)
 
-    contexts = [
-        match['metadata']['text'] for match in contexts_with_metadata
-        if match['score'] >= similarity_threshold
-    ]
+            contexts = [
+                match['metadata']['text'] for match in contexts_with_metadata
+                if match['score'] >= similarity_threshold
+            ]
 
-    avg_score = sum(match['score'] for match in contexts_with_metadata) / len(contexts_with_metadata)
+            avg_score = sum(match['score'] for match in contexts_with_metadata) / len(contexts_with_metadata)
 
-    # Logging
-    with open("last_response.txt", "w") as file:
-        file.write("")
-    with open("last_response.txt", "a") as file:
-        file.write(f"average score: {avg_score} of retrieved contexts. kept {len(contexts)}/{len(contexts_with_metadata)} .\n")
+            # Logging
+            with open("last_response.txt", "w") as file:
+                file.write("")
+            with open("last_response.txt", "a") as file:
+                file.write(f"average score: {avg_score} of retrieved contexts. kept {len(contexts)}/{len(contexts_with_metadata)} .\n")
 
-    # combine the current query with conversation history
-    full_context = "\n".join(conversation_history) + "\n" + query
-    augmented_query = augment_query(full_context, contexts)
+            # combine the current query with conversation history
+            full_context = "\n".join(conversation_history) + "\n" + query
+            augmented_query = augment_query(full_context, contexts)
 
-    # Logging
-    with open("last_response.txt", "a") as file:
-        file.write(f"all contexts seen: {augmented_query}\n")
-    
-    response = generate_response(primer, augmented_query, openai, model="gpt-4o")
-    return response
+            # Logging
+            with open("last_response.txt", "a") as file:
+                file.write(f"all contexts seen: {augmented_query}\n")
+            
+            response = generate_response(primer, augmented_query, openai, model="gpt-4o")
+            return response
+
+        except openai.error.RateLimitError:
+            if attempt == max_retries - 1:  # If this was the last attempt
+                return "I apologize, but I'm experiencing high traffic at the moment. Please try again in a few moments."
+            time.sleep(20 * (attempt + 1))  # Wait longer between retries
+        except Exception as e:
+            return f"I apologize, but I encountered an error while processing your request. Please try again in a moment."
 
 def copy_to_clipboard(text):
     # Clean up the text
