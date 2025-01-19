@@ -1,6 +1,7 @@
 import streamlit as st
 import openai
 from pinecone import Pinecone
+from PyPDF2 import PdfReader
 from docx2pdf import convert as docx_to_pdf
 import os
 import re
@@ -18,23 +19,21 @@ from llama_parse import LlamaParse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from utils.text_cleaning import read_text_file, clean_text
 from utils.getting_embeddings import get_embeddings
-from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts, retrieve_contexts_with_metadata
-from utils.ChunkingHandler import ChunkingHandler
+from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
 
 # Load environment variables 
 load_dotenv()
 
 primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
 designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
-Your response should be based on the information available in the documents uploaded and some reasonable conclusions that you can make from them.
+Your responses should be based strictly on the information provided by the user in their query and the given context. 
 Use the following pieces of context to answer the question at the end in detail with clear explanations. 
+If you don't know the answer, explicitly state that you don't know, and do not attempt to fabricate an answer. 
 Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance. 
 Be concise yet thorough in your explanations.
 Lastly, make sure to always follow the tone and structure of a customer service email.
+If there is a name presented to you within your prompt make sure to address the email to that person.
 Do not include email headers, greetings, or signatures in your response.
-Also don't mention the provided context, just treat that as your knowledge base.
-Don't say: Thank you for reaching out instead use Thank you for contacting us.  
-And dont need to start a response to an email with Thank you for contacting us. Just start with the answer.
 """
 
 # Initialize Pinecone client
@@ -106,43 +105,16 @@ def upload_documents_to_pinecone(file_paths):
     return results
 
 #------------------Querying Pinecone
-def query_pinecone(query, conversation_history, similarity_threshold=0):
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            query_embedding = get_embeddings(query, openai)[0]
-            contexts_with_metadata = retrieve_contexts_with_metadata(index, query_embedding, 100)
-
-            contexts = [
-                match['metadata']['text'] for match in contexts_with_metadata
-                if match['score'] >= similarity_threshold
-            ]
-
-            avg_score = sum(match['score'] for match in contexts_with_metadata) / len(contexts_with_metadata)
-
-            # Logging
-            with open("last_response.txt", "w") as file:
-                file.write("")
-            with open("last_response.txt", "a") as file:
-                file.write(f"average score: {avg_score} of retrieved contexts. kept {len(contexts)}/{len(contexts_with_metadata)} .\n")
-
-            # combine the current query with conversation history
-            full_context = "\n".join(conversation_history) + "\n" + query
-            augmented_query = augment_query(full_context, contexts)
-
-            # Logging
-            with open("last_response.txt", "a") as file:
-                file.write(f"all contexts seen: {augmented_query}\n")
-            
-            response = generate_response(primer, augmented_query, openai, model="gpt-4o")
-            return response
-
-        except openai.error.RateLimitError:
-            if attempt == max_retries - 1:  # If this was the last attempt
-                return "I apologize, but I'm experiencing high traffic at the moment. Please try again in a few moments."
-            time.sleep(20 * (attempt + 1))  # Wait longer between retries
-        except Exception as e:
-            return f"I apologize, but I encountered an error while processing your request. Please try again in a moment."
+def query_pinecone(query, conversation_history):
+    query_embedding = get_embeddings(query, openai)[0]
+    contexts = retrieve_contexts(index, query_embedding, 30)
+    
+    # Combine the current query with conversation history
+    full_context = "\n".join(conversation_history) + "\n" + query
+    augmented_query = augment_query(full_context, contexts)
+    
+    response = generate_response(primer, augmented_query, openai)
+    return response
 
 def copy_to_clipboard(text):
     # Clean up the text
@@ -156,28 +128,28 @@ def copy_to_clipboard(text):
     
     # Create a simple button with JavaScript functionality
     copy_button_html = f"""
-            <style>
-            .copy-button {{
-                background-color: rgb(19, 101, 168);
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                font-size: 14px;
-                cursor: pointer;
-                border-radius: 5px;
-                width: 50px;
-                height: 35px;
-                display: inline-flex;
-                justify-content: center;
-                align-items: center;
-            }}
-            </style>
-            <button 
-                class="copy-button"
-                onclick='navigator.clipboard.writeText("{text}")'>
-                Copy
-            </button>
-        """
+        <style>
+        .copy-button {{
+            background-color: rgb(19, 101, 168);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 50px;
+            height: 35px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }}
+        </style>
+        <button 
+            class="copy-button"
+            onclick="navigator.clipboard.writeText(`{text.replace('`', '\\`')}`)">
+            Copy
+        </button>
+    """
     
     html(copy_button_html, height=50)
 
@@ -208,7 +180,7 @@ if page == "Document Upload":
             file_paths = []
             for uploaded_file in uploaded_files:
                 file_path = os.path.join("/tmp", uploaded_file.name)
-                with  open(file_path, "wb") as f:
+                with open(file_path, "wb") as f:
                     f.write(uploaded_file.getbuffer())
                 file_paths.append(file_path)
                 st.success(f"Uploaded `{uploaded_file.name}`")
