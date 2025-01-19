@@ -33,6 +33,8 @@ Be concise yet thorough in your explanations.
 Lastly, make sure to always follow the tone and structure of a customer service email.
 Do not include email headers, greetings, or signatures in your response.
 Also don't mention the provided context, just treat that as your knowledge base.
+Don't say: Thank you for reaching out instead use Thank you for contacting us.  
+And dont need to start a response to an email with Thank you for contacting us. Just start with the answer.
 """
 
 # Initialize Pinecone client
@@ -51,28 +53,9 @@ def read_pdf_file(file_path):
     documents = llama_parser.load_data(file_path)
     return [doc.text for doc in documents]
 
-
-
-def process_document(file_path, delimiters=None):
-    """
-    Processes a document by reading its content, splitting it into chunks based on size, overlap, and delimiters,
-    generating embeddings for each chunk, and upserting them into a Pinecone index.
-
-    Args:
-        file_path (str): The path to the document file.
-        delimiters (list, optional): A list of delimiter strings that indicate where to start a new chunk.
-                                     Defaults to ['#'] if not provided.
-
-    Returns:
-        tuple: A tuple containing an error message (if any) and a success message.
-    """
+def process_document(file_path):
     try:
-        if delimiters is None:
-            delimiters = ['#']  # Default delimiter
-
-        pdf_path = os.path.splitext(file_path)[0] + '.pdf'
-        
-        # Read the document based on its file extension
+        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf' # Make a destination path, this will hold the path of the pdf file if we have to perform a conversion
         if file_path.endswith('.txt'):
             document_texts = read_text_file(file_path)
         elif file_path.endswith('.pdf'):
@@ -82,71 +65,36 @@ def process_document(file_path, delimiters=None):
             document_texts = read_pdf_file(pdf_path)
         else:
             return f"Unsupported file format: {file_path}", None
-
-        # Regroup document texts with a newline separator
-        document_texts = "\n".join(document_texts)
-
-        # Clean the text
-        document_texts = clean_text(document_texts)
-
-        # Upload the document text as a .txt file for debugging
-        with open("document_test2.txt", "a") as file:
-            file.write(document_texts)
         
-        # Extract the ID
         document_id = os.path.basename(file_path)
         
-        def chunk_text(text):
-
-            # Apply our nice chunking handler to do all of the chunking for us
-            handler = ChunkingHandler(text)
-            handler.remove_empty(handler.text.split('\n')) \
-                   .list_to_text(seperator='\n') \
-                   .split_by_headers() \
-                   .remove_header_notation('#') \
-                   .remove_header_notation('WHITESPACE') \
-                   .split_on_enumeration() \
-                   .merge_short_sentences(char_limit=40) \
-                   .move_ending_all_caps_line() \
-                   .remove_empty(handler.chunks) \
-                   .remove_duplicates() \
-                   .overlap_wordcount_chunking(max_words=250, overlap=50)
-
-            # Assert that the handler chunks is not None
-            assert handler.chunks is not None
+        for i, document_text in enumerate(document_texts):
+            document_text = clean_text(document_text)
+            embeddings = get_embeddings(document_text, openai)
             
-            for chunk in handler.chunks:
-                yield chunk
-
-        chunk_generator = chunk_text(document_texts)
-
-        # Generate embeddings and upsert into Pinecone
-        for i, chunk in enumerate(chunk_generator):
-
-            with open("chunks.txt", "a") as file:
-                file.write(chunk)
-                file.write('-' * 300)
-
-
-            # embeddings = get_embeddings(chunk, client = None, model = "text-embedding-3-large")
-            embeddings = get_embeddings(chunk, client = None)
-            if isinstance(embeddings[0], float):
-                embedding = embeddings
-            else:
-                assert len(embeddings) == 1, "Expected only one embedding"
-                embedding = embeddings[0]
-            vector_id = f"{document_id}_{i}_0"
-            index.upsert([{
-                "id": vector_id,
-                "values": embedding,
-                "metadata": {"text": chunk}
-            }])
-
+            # Upsert each embedding into Pinecone
+            for j, embedding in enumerate(embeddings):
+                print(embedding)
+                
+                DOCUMENT_LENGTH_LIMIT = 20_000
+                
+                if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the text exceeds the limit
+                    print("Metadata length limit exceeded, cutting the length short and upserting to pinecone with some text removed!")
+                    document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
+                
+                index.upsert(
+                vectors=[
+                    {
+                        "id": f"{document_id}_chunk_{i}_{j}",
+                        "values": embedding,
+                        "metadata": {"text": document_text}
+                    }
+                ]
+            )
+        
         return None, f"Document '{document_id}' successfully added to Pinecone index."
-
     except Exception as e:
         return f"Error processing file {file_path}: {e}", None
-        
 
 def upload_documents_to_pinecone(file_paths):
     results = []
