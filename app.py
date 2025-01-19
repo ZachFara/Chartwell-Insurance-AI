@@ -128,28 +128,28 @@ def copy_to_clipboard(text):
     
     # Create a simple button with JavaScript functionality
     copy_button_html = f"""
-        <style>
-        .copy-button {{
-            background-color: rgb(19, 101, 168);
-            border: none;
-            color: white;
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            border-radius: 5px;
-            width: 50px;
-            height: 35px;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-        }}
-        </style>
-        <button 
-            class="copy-button"
-            onclick="navigator.clipboard.writeText(`{text.replace('`', '\\`')}`)">
-            Copy
-        </button>
-    """
+            <style>
+            .copy-button {{
+                background-color: rgb(19, 101, 168);
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                font-size: 14px;
+                cursor: pointer;
+                border-radius: 5px;
+                width: 50px;∂
+                height: 35px;
+                display: inline-flex;
+                justify-content: center;
+                align-items: center;
+            }}
+            </style>
+            <button 
+                class="copy-button"
+                onclick='navigator.clipboard.writeText("{text}")'>
+                Copy
+            </button>
+        """
     
     html(copy_button_html, height=50)
 
