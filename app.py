@@ -35,15 +35,20 @@ Do not include email headers, greetings, or signatures in your response.
 Also don't mention the provided context, just treat that as your knowledge base.
 """
 
+pc_key = st.secrets["PINECONE_API_KEY"]
+oa_key = st.secrets["OPENAI_API_KEY"]
+lc_key = st.secrets["LLAMA_CLOUD_API_KEY"]
+
 # Initialize Pinecone client
-pc = Pinecone(api_key=os.getenv("PINECONE_API_KEY"))
+pc = Pinecone(api_key=pc_key)
+
 index = pc.Index("insurancedoc")
 
 # Initialize OpenAI API key
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = oa_key
 
 # # Initialize LlamaParse
-llama_parser = LlamaParse(result_type="markdown")
+llama_parser = LlamaParse(result_type="markdown", api_key=lc_key)
 
 #------------------Document Processing
 
