@@ -31,15 +31,16 @@ The **Chartwell Insurance AI Assistant** is a Streamlit application designed to 
 - **Email Formatting**: Responses are formatted as customer service emails, including subject lines and personalized greetings.
 - **Session Management**: Clear conversation history and manage your chat sessions.
 - **FAQ Section**: Access frequently asked questions for quick guidance.
+- **Hyperparameter Tuning**: Built-in system for optimizing chunking strategies, retrieval parameters, and system prompts through systematic evaluation.
+- **Modular Architecture**: Clean separation of concerns with configurable components for easy customization and testing.
 
 
 ## Prerequisites
 
-- Python 3.8 or higher
-- An OpenAI API key
-- A Pinecone API key
-- [LlamaParser](https://github.com/llama-parser) for PDF parsing
-- [Spacy](https://spacy.io/) for natural language processing
+- **Python 3.13** (or compatible version)
+- **OpenAI API key** - For GPT-4 model access
+- **Pinecone API key** - For vector storage and retrieval
+- **LlamaParse API key** (optional) - For advanced PDF parsing
 
 ## Installation
 
@@ -126,29 +127,86 @@ streamlit run app.py
 
 Access the **FAQ** page to find answers to common questions about using the application.
 
+## Hyperparameter Tuning
+
+The application includes a comprehensive tuning system to optimize the AI assistant's performance:
+
+### Running Hyperparameter Tuning
+
+```bash
+python tuning/main.py
+```
+
+The tuning system will:
+- Test different chunking strategies (chunk size, overlap)
+- Evaluate various retrieval parameters (top-k similarity)
+- Experiment with different system prompts
+- Generate detailed performance metrics and results
+
+### Tuning Results
+
+Results are automatically saved to:
+- `tuning/results/detailed_results.csv`: Individual evaluation scores
+- `tuning/results/iteration_summary.csv`: Summary statistics per iteration
+
+You can analyze these results to identify optimal parameters for your specific use case and dataset.
+
 ## Project Structure
 
 ```
 chartwell-insurance-ai-assistant/
-├── app.py
-├── requirements.txt
+├── app.py                          # Main Streamlit application
+├── requirements.txt                # Python dependencies
 ├── README.md
-├── .env
-└── src/
-    ├── utils/
-    │   ├── document_processing.py
-    │   ├── embeddings.py
-    │   └── chatbot_functions.py
-    └── 
+├── .env                           # Environment variables (not committed)
+├── data/                          # Data storage directory
+│   └── raw/                       # Raw insurance documents (PDFs)
+├── src/                           # Core application source code
+│   ├── __init__.py
+│   ├── agent.py                   # Main AI agent orchestrator
+│   ├── configuration.py          # Configuration management
+│   ├── document_loader.py         # Document processing and chunking
+│   ├── vector_store_manager.py    # Pinecone vector store management
+│   └── components/                # Reusable components
+├── tuning/                        # Hyperparameter tuning system
+│   ├── main.py                    # Tuning entry point
+│   ├── data/
+│   │   ├── eval/
+│   │   │   └── sample_questions.csv  # Evaluation questions dataset
+│   │   └── system_prompts/
+│   │       └── system_prompts.json   # System prompt variations
+│   ├── results/                   # Tuning results and metrics
+│   │   ├── detailed_results.csv   # Detailed evaluation results
+│   │   └── iteration_summary.csv  # Summary of tuning iterations
+│   └── src/                       # Tuning system components
+│       ├── evaluator.py           # Response evaluation logic
+│       ├── hyperparameter_sampler.py  # Parameter sampling
+│       ├── results_manager.py     # Results tracking and analysis
+│       └── tuning_orchestrator.py # Main tuning coordinator
+├── utils/                         # Utility functions
+│   ├── getting_embeddings.py      # Embedding generation utilities
+│   ├── querying_pinecone.py       # Pinecone query utilities
+│   └── text_cleaning.py           # Text preprocessing utilities
+└── notebooks/                     # Jupyter notebooks for development
+    ├── Chartwell_AI.ipynb         # Main development notebook
+    ├── cleaning_pdfs.ipynb        # PDF cleaning experiments
+    └── extract_pdf.ipynb          # PDF extraction experiments
 ```
 
-- **app.py**: Main application script.
-- **requirements.txt**: Python dependencies.
-- **.env**: Environment variables (not committed to version control).
-- **assets/**: Images and media for the README and application.
-- **src/**: Source code directory.
-  - **utils/**: Utility modules for document processing, embeddings, and chatbot functions.
-  - **templates/**: Template files such as the system prompt primer.
+### Key Components
+
+- **app.py**: Main Streamlit application interface
+- **src/**: Modular core application with clean separation of concerns
+  - **agent.py**: AI agent with tunable parameters (chunk size, overlap, top-k retrieval)
+  - **configuration.py**: Centralized configuration management
+  - **document_loader.py**: Handles document ingestion and chunking strategies
+  - **vector_store_manager.py**: Manages Pinecone vector store operations
+- **tuning/**: Comprehensive hyperparameter optimization system
+  - Evaluates different chunking methods, retrieval parameters, and system prompts
+  - Tracks performance metrics across multiple iterations
+  - Supports systematic optimization of the RAG pipeline
+- **data/raw/**: Insurance policy documents and reference materials
+- **utils/**: Shared utility functions for embeddings, queries, and text processing
 
 
 
@@ -158,7 +216,3 @@ chartwell-insurance-ai-assistant/
 
 *Disclaimer: Chartwell Insurance AI is a tool and may provide inaccurate information. Always verify important details.*
 
-
-# TODO
-- Make it so that the agent can start by just connecting to the vector store and not by loading anything into it
-- Fix the app to interact with the agent
