@@ -134,7 +134,7 @@ You can analyze these results to identify optimal parameters for your specific u
 ## Project Structure
 
 ```
-chartwell-insurance-ai-assistant/
+Chartwell-Insurance-AI/
 ├── app.py                          # Main Streamlit application
 ├── requirements.txt                # Python dependencies
 ├── README.md
@@ -148,29 +148,21 @@ chartwell-insurance-ai-assistant/
 │   ├── document_loader.py         # Document processing and chunking
 │   ├── vector_store_manager.py    # Pinecone vector store management
 │   └── components/                # Reusable components
-├── tuning/                        # Hyperparameter tuning system
-│   ├── main.py                    # Tuning entry point
-│   ├── data/
-│   │   ├── eval/
-│   │   │   └── sample_questions.csv  # Evaluation questions dataset
-│   │   └── system_prompts/
-│   │       └── system_prompts.json   # System prompt variations
-│   ├── results/                   # Tuning results and metrics
-│   │   ├── detailed_results.csv   # Detailed evaluation results
-│   │   └── iteration_summary.csv  # Summary of tuning iterations
-│   └── src/                       # Tuning system components
-│       ├── evaluator.py           # Response evaluation logic
-│       ├── hyperparameter_sampler.py  # Parameter sampling
-│       ├── results_manager.py     # Results tracking and analysis
-│       └── tuning_orchestrator.py # Main tuning coordinator
-├── utils/                         # Utility functions
-│   ├── getting_embeddings.py      # Embedding generation utilities
-│   ├── querying_pinecone.py       # Pinecone query utilities
-│   └── text_cleaning.py           # Text preprocessing utilities
-└── notebooks/                     # Jupyter notebooks for development
-    ├── Chartwell_AI.ipynb         # Main development notebook
-    ├── cleaning_pdfs.ipynb        # PDF cleaning experiments
-    └── extract_pdf.ipynb          # PDF extraction experiments
+└── tuning/                        # Hyperparameter tuning system
+    ├── main.py                    # Tuning entry point
+    ├── data/
+    │   ├── eval/
+    │   │   └── sample_questions.csv  # Evaluation questions dataset
+    │   └── system_prompts/
+    │       └── system_prompts.json   # System prompt variations
+    ├── results/                   # Tuning results and metrics
+    │   ├── detailed_results.csv   # Detailed evaluation results
+    │   └── iteration_summary.csv  # Summary of tuning iterations
+    └── src/                       # Tuning system components
+        ├── evaluator.py           # Response evaluation logic
+        ├── hyperparameter_sampler.py  # Parameter sampling
+        ├── results_manager.py     # Results tracking and analysis
+        └── tuning_orchestrator.py # Main tuning coordinator
 ```
 
 ### Key Components
@@ -186,7 +178,6 @@ chartwell-insurance-ai-assistant/
   - Tracks performance metrics across multiple iterations
   - Supports systematic optimization of the RAG pipeline
 - **data/raw/**: Insurance policy documents and reference materials
-- **utils/**: Shared utility functions for embeddings, queries, and text processing
 
 
 
