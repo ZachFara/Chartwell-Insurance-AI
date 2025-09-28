@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 from llama_index.core import Settings
 from llama_index.embeddings.openai import OpenAIEmbedding
 from llama_index.llms.openai import OpenAI
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 class Configuration:
     """Handles all configuration loading from environment variables or Streamlit secrets."""
@@ -205,3 +205,21 @@ class Configuration:
     def get_all_config(self) -> Dict[str, Any]:
         """Get a copy of the entire configuration dictionary."""
         return self.config.copy()
+    
+    def __str__(self) -> str:
+        """Return a user-friendly string representation of the configuration status."""
+        if not self.config:
+            return "❌ Not Configured"
+        
+        # Check for essential configurations
+        has_openai = bool(self.config.get('openai_api_key'))
+        has_pinecone = bool(self.config.get('pinecone_api_key'))
+        
+        if has_openai and has_pinecone:
+            return "✅ Fully Configured"
+        elif has_openai:
+            return "⚠️ Partially Configured (OpenAI Only)"
+        elif has_pinecone:
+            return "⚠️ Partially Configured (Pinecone Only)"
+        else:
+            return "❌ Missing API Keys"
