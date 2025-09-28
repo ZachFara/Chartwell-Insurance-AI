@@ -135,34 +135,34 @@ You can analyze these results to identify optimal parameters for your specific u
 
 ```
 Chartwell-Insurance-AI/
-├── app.py                          # Main Streamlit application
-├── requirements.txt                # Python dependencies
+├── app.py                           # Main Streamlit application
+├── requirements.txt                 # Python dependencies
 ├── README.md
-├── .env                           # Environment variables (not committed)
-├── data/                          # Data storage directory
-│   └── raw/                       # Raw insurance documents (PDFs)
-├── src/                           # Core application source code
+├── .env                             # Environment variables (not committed)
+├── data/                            # Data storage directory
+│   └── raw/                         # Raw insurance documents (PDFs)
+├── src/                             # Core application source code
 │   ├── __init__.py
-│   ├── agent.py                   # Main AI agent orchestrator
-│   ├── configuration.py          # Configuration management
-│   ├── document_loader.py         # Document processing and chunking
-│   ├── vector_store_manager.py    # Pinecone vector store management
-│   └── components/                # Reusable components
-└── tuning/                        # Hyperparameter tuning system
-    ├── main.py                    # Tuning entry point
+│   ├── agent.py                     # Main AI agent orchestrator
+│   ├── configuration.py             # Configuration management
+│   ├── document_loader.py           # Document processing and chunking
+│   ├── vector_store_manager.py      # Pinecone vector store management
+│   └── components/                  # Reusable components
+└── tuning/                          # Hyperparameter tuning system
+    ├── main.py                      # Tuning entry point
     ├── data/
     │   ├── eval/
-    │   │   └── sample_questions.csv  # Evaluation questions dataset
+    │   │   └── sample_questions.csv # Evaluation questions dataset
     │   └── system_prompts/
-    │       └── system_prompts.json   # System prompt variations
-    ├── results/                   # Tuning results and metrics
-    │   ├── detailed_results.csv   # Detailed evaluation results
-    │   └── iteration_summary.csv  # Summary of tuning iterations
-    └── src/                       # Tuning system components
-        ├── evaluator.py           # Response evaluation logic
-        ├── hyperparameter_sampler.py  # Parameter sampling
-        ├── results_manager.py     # Results tracking and analysis
-        └── tuning_orchestrator.py # Main tuning coordinator
+    │       └── system_prompts.json  # System prompt variations
+    ├── results/                     # Tuning results and metrics
+    │   ├── detailed_results.csv     # Detailed evaluation results
+    │   └── iteration_summary.csv    # Summary of tuning iterations
+    └── src/                         # Tuning system components
+        ├── evaluator.py             # Response evaluation logic
+        ├── hyperparameter_sampler.py # Parameter sampling
+        ├── results_manager.py       # Results tracking and analysis
+        └── tuning_orchestrator.py   # Main tuning coordinator
 ```
 
 ### Key Components
