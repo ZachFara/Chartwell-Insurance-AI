@@ -47,11 +47,9 @@ The **Chartwell Insurance AI Assistant** is a Streamlit application designed to 
 1. **Clone the Repository**
 
    ```bash
-   git clone https://github.com/yourusername/chartwell-insurance-ai-assistant.git
-   cd chartwell-insurance-ai-assistant
-   ```
-
-2. **Create a Virtual Environment**
+   git clone https://github.com/ZachFara/Chartwell-Insurance-AI.git
+   cd Chartwell-Insurance-AI
+   ```2. **Create a Virtual Environment**
 
    ```bash
    python -m venv venv
@@ -73,26 +71,8 @@ The **Chartwell Insurance AI Assistant** is a Streamlit application designed to 
    ```env
    OPENAI_API_KEY=your_openai_api_key
    PINECONE_API_KEY=your_pinecone_api_key
+   LLAMAPARSE_API_KEY=your_llamaparse_api_key  # Optional
    ```
-
-2. **Configure Pinecone**
-
-   Initialize Pinecone in your code or as part of your environment setup:
-
-   ```python
-   import pinecone
-   pinecone.init(api_key=os.getenv("PINECONE_API_KEY"))
-   ```
-
-3. **Download Spacy Model**
-
-   ```bash
-   python -m spacy download en_core_web_sm
-   ```
-
-4. **Set Up LlamaParser**
-
-   Follow the instructions on the [LlamaParser GitHub page](https://github.com/llama-parser) to install and configure.
 
 ## Running the Application
 
