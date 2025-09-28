@@ -1,315 +1,305 @@
 import streamlit as st
-import openai
-from pinecone import Pinecone
-from PyPDF2 import PdfReader
-from docx2pdf import convert as docx_to_pdf
-import os
 import re
-from dotenv import load_dotenv
-import nest_asyncio
 import time
-import streamlit as st
-# from bokeh.models.widgets import Button
-from streamlit.components.v1 import html
-# from bokeh.models import CustomJS
-# from streamlit_bokeh_events import streamlit_bokeh_events
-import time
-nest_asyncio.apply()
-from llama_parse import LlamaParse
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from utils.text_cleaning import read_text_file, clean_text
-from utils.getting_embeddings import get_embeddings
-from utils.querying_pinecone import retrieve_contexts, generate_response, augment_query, filter_contexts
+from pathlib import Path
+import tempfile
+from src.agent import Agent
 
-# Load environment variables 
-load_dotenv()
+# Page config
+st.set_page_config(
+    page_title="Chartwell Insurance AI Assistant",
+    page_icon="🏢",
+    layout="wide"
+)
 
-primer = """You are a highly intelligent Q&A bot for Chartwell Insurance, 
-designed to assist our customer service team by providing accurate and professional answers to customer queries and emails. 
-Your response should be based on the information available in the documents uploaded and some reasonable conclusions that you can make from them.
-Use the following pieces of context to answer the question at the end in detail with clear explanations. 
-Always maintain a professional and courteous tone, as if you are representing Chartwell Insurance. 
-Be concise yet thorough in your explanations.
-Lastly, make sure to always follow the tone and structure of a customer service email.
-Do not include email headers, greetings, or signatures in your response.
-Also don't mention the provided context, just treat that as your knowledge base.
-"""
-
-pc_key = st.secrets["PINECONE_API_KEY"]
-oa_key = st.secrets["OPENAI_API_KEY"]
-lc_key = st.secrets["LLAMA_CLOUD_API_KEY"]
-
-# Initialize Pinecone client
-pc = Pinecone(api_key=pc_key)
-
-index = pc.Index("insurancedoc")
-
-# Initialize OpenAI API key
-openai.api_key = oa_key
-
-# # Initialize LlamaParse
-llama_parser = LlamaParse(result_type="markdown", api_key=lc_key)
-
-#------------------Document Processing
-
-def read_pdf_file(file_path):
-    documents = llama_parser.load_data(file_path)
-    return [doc.text for doc in documents]
-
-def process_document(file_path):
+@st.cache_resource
+def initialize_agent(
+    chunk_size=512, 
+    chunk_overlap=50, 
+    similarity_top_k=5, 
+    system_prompt_override=None
+):
+    """Initialize the agent and connect to existing Pinecone index."""
+    agent = Agent(
+        name="Chartwell Insurance Assistant", 
+        use_pinecone=True,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        similarity_top_k=similarity_top_k,
+        system_prompt_override=system_prompt_override
+    )
+    
+    # Try to connect to existing index first
     try:
-        pdf_path = file_path.rsplit('.', 1)[0] + '.pdf' # Make a destination path, this will hold the path of the pdf file if we have to perform a conversion
-        if file_path.endswith('.txt'):
-            document_texts = read_text_file(file_path)
-        elif file_path.endswith('.pdf'):
-            document_texts = read_pdf_file(file_path)
-        elif file_path.endswith('.docx'):
-            docx_to_pdf(file_path, pdf_path)
-            document_texts = read_pdf_file(pdf_path)
-        else:
-            return f"Unsupported file format: {file_path}", None
-        
-        document_id = os.path.basename(file_path)
-        
-        for i, document_text in enumerate(document_texts):
-            document_text = clean_text(document_text)
-            embeddings = get_embeddings(document_text, openai)
-            
-            # Upsert each embedding into Pinecone
-            for j, embedding in enumerate(embeddings):
-                print(embedding)
-                
-                DOCUMENT_LENGTH_LIMIT = 20_000
-                
-                if len(document_text) > DOCUMENT_LENGTH_LIMIT:  # Check if the text exceeds the limit
-                    print("Metadata length limit exceeded, cutting the length short and upserting to pinecone with some text removed!")
-                    document_text = document_text[:DOCUMENT_LENGTH_LIMIT]
-                
-                index.upsert(
-                vectors=[
-                    {
-                        "id": f"{document_id}_chunk_{i}_{j}",
-                        "values": embedding,
-                        "metadata": {"text": document_text}
-                    }
-                ]
-            )
-        
-        return None, f"Document '{document_id}' successfully added to Pinecone index."
+        agent.connect_to_existing_index()
+        st.session_state.agent_status = "Connected to existing index"
+        return agent
     except Exception as e:
-        return f"Error processing file {file_path}: {e}", None
-
-def upload_documents_to_pinecone(file_paths):
-    results = []
-    with ThreadPoolExecutor() as executor:
-        future_to_file = {executor.submit(process_document, file_path): file_path for file_path in file_paths}
-        for future in as_completed(future_to_file):
-            error, success = future.result()
-            results.append((error, success))
-    return results
-
-#------------------Querying Pinecone
-def query_pinecone(query, conversation_history):
-    query_embedding = get_embeddings(query, openai)[0]
-    contexts = retrieve_contexts(index, query_embedding, 30)
-    
-    # Combine the current query with conversation history
-    full_context = "\n".join(conversation_history) + "\n" + query
-    augmented_query = augment_query(full_context, contexts)
-    
-    response = generate_response(primer, augmented_query, openai)
-    return response
+        st.session_state.agent_status = f"Failed to connect to existing index: {str(e)}"
+        return agent
 
 def copy_to_clipboard(text):
+    """Create a copy button for text content."""
     # Clean up the text
-    # 1. Remove the subject line
-    subject_pattern = re.compile(r"^Subject:.*$", re.MULTILINE)
-    text = re.sub(subject_pattern, "", text)
-    # 2. Remove bolding for MD format
-    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
-    # 3. Remove any spaces or newlines that come before the response
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)  # Remove markdown bold
     text = text.lstrip()
     
-    # Create a simple button with JavaScript functionality
     copy_button_html = f"""
-            <style>
-            .copy-button {{
-                background-color: rgb(19, 101, 168);
-                border: none;
-                color: white;
-                padding: 8px 16px;
-                font-size: 14px;
-                cursor: pointer;
-                border-radius: 5px;
-                width: 50px;∂
-                height: 35px;
-                display: inline-flex;
-                justify-content: center;
-                align-items: center;
-            }}
-            </style>
-            <button 
-                class="copy-button"
-                onclick='navigator.clipboard.writeText("{text}")'>
-                Copy
-            </button>
-        """
-    
-    html(copy_button_html, height=50)
+        <style>
+        .copy-button {{
+            background-color: rgb(19, 101, 168);
+            border: none;
+            color: white;
+            padding: 8px 16px;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+            width: 80px;
+            height: 35px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+        }}
+        </style>
+        <button 
+            class="copy-button"
+            onclick='navigator.clipboard.writeText(`{text}`)'>
+            Copy
+        </button>
+    """
+    st.components.v1.html(copy_button_html, height=50)
+
+def format_as_email(content, subject="Insurance Inquiry", recipient="Customer", sender="Chartwell Team"):
+    """Format AI response as a professional email."""
+    email_content = f"""Subject: {subject}
+
+Dear {recipient},
+
+{content}
+
+Best regards,
+{sender}
+Chartwell Insurance"""
+    return email_content
 
 def clear_conversation():
+    """Clear the conversation history."""
     st.session_state.messages = []
 
-#------------------Streamlit Interface
+# Initialize agent
+if 'agent' not in st.session_state:
+    st.session_state.agent = initialize_agent()
+
+# Sidebar
 st.sidebar.image("https://www.chartwellins.com/img/~www.chartwellins.com/layout-assets/logo.png", use_container_width=True)
 st.sidebar.title("Chartwell Insurance AI Assistant")
 
-st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Document Upload", "Chatbot", "FAQ"])
+# Display agent status
+if 'agent_status' in st.session_state:
+    if "Connected" in st.session_state.agent_status:
+        st.sidebar.success(st.session_state.agent_status)
+    else:
+        st.sidebar.error(st.session_state.agent_status)
 
+# Navigation
+st.sidebar.header("Navigation")
+page = st.sidebar.radio("Go to", ["Chatbot", "Document Upload", "Index Status", "FAQ"])
+
+# Document Upload Page
 if page == "Document Upload":
     st.header("📄 Document Upload")
-    st.write("Upload your documents below to add them to the AI assistant's knowledge base.")
+    st.write("Upload documents to enhance the AI assistant's knowledge base.")
 
     uploaded_files = st.file_uploader(
-        "Choose TXT or PDF files",
-        type=["txt", "pdf"],
+        "Choose PDF or TXT files",
+        type=["pdf", "txt", "csv"],
         accept_multiple_files=True,
-        help="You can upload multiple files at once."
+        help="Upload multiple files to add to the knowledge base."
     )
-    st.caption("Currently, we support uploading up to **1000 pages per day** (1200 pages per file max).")
 
-    if st.button("Upload and Index Documents"):
+    if st.button("Upload and Index Documents", type="primary"):
         if uploaded_files:
-            file_paths = []
-            for uploaded_file in uploaded_files:
-                file_path = os.path.join("/tmp", uploaded_file.name)
-                with open(file_path, "wb") as f:
-                    f.write(uploaded_file.getbuffer())
-                file_paths.append(file_path)
-                st.success(f"Uploaded `{uploaded_file.name}`")
+            # Create temporary directory for uploaded files
+            with tempfile.TemporaryDirectory() as temp_dir:
+                file_paths = []
+                for uploaded_file in uploaded_files:
+                    file_path = Path(temp_dir) / uploaded_file.name
+                    with open(file_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                    file_paths.append(str(file_path))
+                    st.success(f"Saved {uploaded_file.name}")
 
-            with st.spinner('Uploading and indexing documents...'):
-                progress_bar = st.progress(0)
-                results = upload_documents_to_pinecone(file_paths)
-                progress_bar.progress(100)
-
-            for error, success in results:
-                if error:
-                    st.error(error)
-                if success:
-                    st.success(success)
+                # Ingest documents using the agent
+                with st.spinner('Processing and indexing documents...'):
+                    progress_bar = st.progress(0)
+                    
+                    try:
+                        st.session_state.agent.ingest_directory(temp_dir)
+                        progress_bar.progress(100)
+                        st.success("✅ Documents successfully indexed!")
+                        
+                        # Update status
+                        st.session_state.agent_status = f"Index updated with {len(uploaded_files)} new documents"
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Error indexing documents: {str(e)}")
+                        progress_bar.progress(0)
         else:
             st.warning("Please upload at least one file.")
 
+# Chatbot Page
 elif page == "Chatbot":
+    st.header("💬 AI Assistant")
+    
+    # Check if agent is ready
+    if st.session_state.agent.agent is None:
+        st.warning("⚠️ Agent not connected to index. Please upload documents or check your Pinecone configuration.")
+        st.stop()
+
+    # Initialize messages
     if "messages" not in st.session_state:
         st.session_state.messages = []
 
-    # Sidebar input for email details
-    subject = st.sidebar.text_input("Email Subject", value="Your Subject Here")
-    recipient = st.sidebar.text_input("Recipient Name", value="Recipient")
-    sender = st.sidebar.text_input("Your Name", value="Your Name")
+    # Email formatting options in sidebar
+    st.sidebar.subheader("📧 Email Formatting")
+    subject = st.sidebar.text_input("Subject", value="Insurance Inquiry")
+    recipient = st.sidebar.text_input("Recipient", value="Customer")
+    sender = st.sidebar.text_input("Sender", value="Chartwell Team")
+    format_email = st.sidebar.checkbox("Format as Email", value=True)
 
-    # Function to format assistant's response as an email
-    def format_as_email(content, subject=subject, recipient=recipient, sender=sender):
-        email_content = (
-            f"Subject: {subject}\n\n"
-            f"Dear {recipient},\n\n"
-            f"{content}\n\n"
-            "Best regards,  \n"  # Add two spaces before the newline
-            f"{sender}"
-        )
-        return email_content
-
-    # Chat container
+    # Chat interface
     chat_container = st.container()
 
     with chat_container:
         for message in st.session_state.messages:
             with st.chat_message(message["role"], avatar="🧑‍💼" if message["role"] == "user" else "🤖"):
-                st.markdown(f"**{message['role'].capitalize()}**: {message['content']}")
+                st.markdown(message['content'])
 
     # User input
-    user_input = st.chat_input("Type your question here...")
-
-    if user_input:
+    if user_input := st.chat_input("Ask about insurance policies, coverage, claims..."):
+        # Add user message
         st.session_state.messages.append({"role": "user", "content": user_input})
+        
         with st.chat_message("user", avatar="🧑‍💼"):
-            st.markdown(f"**You**: {user_input}")
+            st.markdown(user_input)
 
+        # Generate response
         with st.chat_message("assistant", avatar="🤖"):
             message_placeholder = st.empty()
-            full_response = ""
-
-            # Show the spinner while processing the response
-            conversation_history = [msg["content"] for msg in st.session_state.messages[-5:]]
-
-            with st.spinner('🤖 Assistant is processing your request...'):
-                response = query_pinecone(user_input, conversation_history)
-
-                full_response = ""
-                for char in response:
-                    full_response += char
-                    time.sleep(0.002)
-                    message_placeholder.markdown(full_response + "▌")
-    
-                # Format the response as an email
-                email_ready_response = format_as_email(full_response)
-                message_placeholder.markdown(email_ready_response)
             
-            # Append the assistant's email-formatted response to the session messages
-            st.session_state.messages.append({"role": "assistant", "content": email_ready_response})
+            with st.spinner('🤖 Analyzing documents and generating response...'):
+                try:
+                    # Get response from agent
+                    response = st.session_state.agent.chat(user_input)
+                    
+                    # Format as email if requested
+                    if format_email:
+                        response = format_as_email(response, subject, recipient, sender)
+                    
+                    # Simulate typing effect
+                    full_response = ""
+                    for char in response:
+                        full_response += char
+                        time.sleep(0.01)
+                        message_placeholder.markdown(full_response + "▌")
+                    
+                    message_placeholder.markdown(full_response)
+                    
+                    # Add to conversation history
+                    st.session_state.messages.append({"role": "assistant", "content": full_response})
+                    
+                    # Copy button
+                    copy_to_clipboard(full_response)
+                    
+                except Exception as e:
+                    st.error(f"❌ Error generating response: {str(e)}")
 
-            # Optional: Copy the email-formatted response to clipboard
-            copy_to_clipboard(email_ready_response)
-
-    # Sidebar button to clear the conversation
+    # Clear conversation button
     if st.sidebar.button("🗑️ Clear Conversation", on_click=clear_conversation):
         st.rerun()
 
-    # Footer with disclaimer
-    def add_footer():
-        st.markdown("""
-        ---
-        <div style='text-align: center;'>
-            <p>© 2024 <strong>Chartwell Insurance</strong>. All rights reserved.</p>
-            <p><i>Disclaimer: Chartwell Insurance AI is a tool and may provide inaccurate information. Always verify important details.</i></p>
-        </div>
-        """, unsafe_allow_html=True)
+# Index Status Page
+elif page == "Index Status":
+    st.header("📊 Index Status")
+    
+    # Get agent stats
+    stats = st.session_state.agent.get_index_stats()
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Agent Information")
+        st.write(f"**Agent Name:** {stats.get('agent_name', 'N/A')}")
+        st.write(f"**Storage Type:** {stats.get('storage_type', 'N/A')}")
+        st.write(f"**Has Index:** {'✅ Yes' if stats.get('has_index') else '❌ No'}")
+        st.write(f"**Agent Ready:** {'✅ Yes' if stats.get('has_agent') else '❌ No'}")
+    
+    with col2:
+        st.subheader("Configuration")
+        st.write(f"**Pinecone Configured:** {'✅ Yes' if stats.get('pinecone_configured') else '❌ No'}")
+        st.write(f"**Config Status:** {stats.get('config_status', 'N/A')}")
+    
+    # Agent actions
+    st.subheader("Actions")
+    col3, col4 = st.columns(2)
+    
+    with col3:
+        if st.button("🔄 Reconnect to Index"):
+            try:
+                result = st.session_state.agent.connect_to_existing_index()
+                st.success(result)
+                st.rerun()
+            except Exception as e:
+                st.error(f"Failed to reconnect: {str(e)}")
+    
+    with col4:
+        if st.button("🗑️ Reset Agent"):
+            st.session_state.agent.reset()
+            st.session_state.messages = []
+            st.success("Agent reset successfully!")
+            st.rerun()
 
-    add_footer()
-
-
-
+# FAQ Page
 elif page == "FAQ":
-    st.header("Frequently Asked Questions")
+    st.header("❓ Frequently Asked Questions")
 
     faqs = [
         {
-            "question": "How do I upload a document?",
-            "answer": "Go to the 'Document Upload' page and select your files to upload."
+            "question": "How does the AI assistant work?",
+            "answer": "The AI assistant uses advanced language models and retrieves information from indexed insurance documents to provide accurate, contextual responses to your queries."
         },
         {
-            "question": "What types of files are supported?",
-            "answer": "Currently, we support .txt and .pdf files."
+            "question": "What documents are in the knowledge base?",
+            "answer": "The knowledge base contains various insurance policies, contracts, and documentation including Berkley One policies, Chubb contracts, and other insurance-related materials."
         },
         {
-            "question": "How can I ask a question?",
-            "answer": "Navigate to the 'Ask a Question' page and enter your query in the text area."
+            "question": "How do I upload new documents?",
+            "answer": "Go to the 'Document Upload' page, select your PDF or TXT files, and click 'Upload and Index Documents'. The AI will process and add them to its knowledge base."
         },
         {
-            "question": "What is the page limit for document uploads?",
-            "answer": "We support uploading up to 1,000 pages per day, with a maximum of 1,200 pages per file."
+            "question": "Can I format responses as emails?",
+            "answer": "Yes! In the Chatbot page, use the sidebar options to customize email formatting including subject, recipient, and sender information."
         },
-        # Add more FAQs as needed
+        {
+            "question": "What if the assistant can't find relevant information?",
+            "answer": "The assistant will let you know if it cannot find relevant information in the indexed documents. You may need to upload additional documents or rephrase your question."
+        },
+        {
+            "question": "How do I clear my conversation history?",
+            "answer": "Use the '🗑️ Clear Conversation' button in the sidebar of the Chatbot page to start a fresh conversation."
+        }
     ]
 
-    filtered_faqs = faqs
+    for faq in faqs:
+        with st.expander(faq["question"]):
+            st.write(faq["answer"])
 
-    if filtered_faqs:
-        for faq in filtered_faqs:
-            with st.expander(faq["question"]):
-                st.write(faq["answer"])
-    else:
-        st.write("No FAQs found matching your search query.")
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style='text-align: center;'>
+    <p>© 2024 <strong>Chartwell Insurance</strong>. All rights reserved.</p>
+    <p><i>Disclaimer: This AI assistant is a tool and may provide inaccurate information. Always verify important details with official documentation.</i></p>
+</div>
+""", unsafe_allow_html=True)

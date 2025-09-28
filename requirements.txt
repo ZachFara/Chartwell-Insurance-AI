@@ -1,14 +1,26 @@
+# Streamlit and web framework
 streamlit
-pinecone
-bokeh==2.4.3
-streamlit-bokeh-events
-PyPDF2
-python-dotenv
-tiktoken
-langchain-community
+
+# Core LlamaIndex packages
 llama-index-core
-llama-parse
+llama-index-embeddings-openai
+llama-index-llms-openai
 llama-index-readers-file
-spacy
-docx2pdf
-openai==0.28
+llama-index-agent-openai
+llama-index-vector-stores-pinecone
+
+# Vector storage
+pinecone
+
+# Document processing
+PyPDF2
+pandas
+
+# OpenAI API
+openai
+
+# Configuration management
+python-dotenv
+
+# Optional parsing (if you use it)
+llama-parse
